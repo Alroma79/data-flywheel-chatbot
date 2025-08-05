@@ -1,0 +1,30 @@
+# Data Flywheel Chatbot Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+databases==0.8.0
+psycopg2-binary==2.9.9
+
+# AI/ML
+openai==1.3.7
+
+# Validation & Configuration
+pydantic==2.5.0
+python-dotenv==1.0.0
+
+# Utilities
+python-multipart==0.0.6
+
+# Development Dependencies (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
