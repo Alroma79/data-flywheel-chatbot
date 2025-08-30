@@ -117,8 +117,9 @@ class KnowledgeProcessor:
                     text = re.sub(r'<[^>]+>', ' ', xml_content)
                     text = re.sub(r'\s+', ' ', text)
                     return text.strip()
-                except:
-                    return "Could not extract text from DOCX file"
+                except Exception as e:
+                    logger.error(f"DOCX extraction failed: {e}")
+                    return ""
     
     def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
         """

@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     max_tokens: Optional[int] = Field(default=None, alias="MAX_TOKENS")
 
     # --- CORS
-    cors_origins: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
+    cors_origins: List[str] = Field(
+        default_factory=lambda: ["http://localhost:8000"],
+        alias="CORS_ORIGINS"
+    )
     cors_credentials: bool = Field(default=True, alias="CORS_CREDENTIALS")
     cors_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_METHODS")
     cors_headers: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_HEADERS")
