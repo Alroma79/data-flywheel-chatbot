@@ -24,6 +24,7 @@ jobs:
         context: .
         push: false
         tags: flywheel:test
+        load: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
         
