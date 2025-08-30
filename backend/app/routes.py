@@ -5,9 +5,9 @@ This module contains all the API endpoints for chat functionality,
 feedback collection, configuration management, and chat history.
 """
 
-from typing import List, Optional
+from typing import List
 from openai import OpenAI
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,6 +18,7 @@ from .db import SessionLocal
 from .models import ChatHistory, Feedback, ChatbotConfig
 from .schemas import ChatRequest, FeedbackCreate, ChatbotConfigCreate, ChatbotConfigOut
 from .knowledge_processor import KnowledgeProcessor
+from .auth import verify_bearer_token
 
 # Initialize settings and logging
 settings = get_settings()
@@ -27,33 +28,7 @@ logger = setup_logging()
 client = OpenAI(api_key=settings.openai_api_key)
 router = APIRouter(tags=["chatbot"])
 
-# Auth dependency for protected endpoints
-def verify_bearer_token(authorization: Optional[str] = Header(None)):
-    """Verify bearer token for protected endpoints."""
-    if not hasattr(settings, 'app_token') or not settings.app_token:
-        # No token configured, skip auth
-        return True
 
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required"
-        )
-
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
-        )
-
-    token = authorization.replace("Bearer ", "")
-    if token != settings.app_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-
-    return True
 
 def get_db() -> Session:
     """
@@ -328,7 +303,7 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
 async def get_chat_history(
     limit: int = Query(10, ge=1, le=100, description="Number of chat history entries to retrieve"),
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_bearer_token)
+    _: None = Depends(verify_bearer_token)
 ):
     """
     Retrieve recent chat history.

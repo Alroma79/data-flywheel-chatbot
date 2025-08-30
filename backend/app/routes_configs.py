@@ -5,8 +5,8 @@ This module contains all the CRUD endpoints for managing chatbot configurations
 under the /api/v1/configs path.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Header
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,7 +15,7 @@ from math import ceil
 
 from .utils import setup_logging
 from .db import SessionLocal
-from .config import get_settings
+from .auth import verify_bearer_token
 from .models import ChatbotConfig
 from .schemas import (
     ChatbotConfigCreate, 
@@ -24,39 +24,10 @@ from .schemas import (
     PaginatedResponse
 )
 
-# Initialize logging and settings
+# Initialize logging
 logger = setup_logging()
-settings = get_settings()
 
 router = APIRouter(prefix="/configs", tags=["chatbot-configs"])
-
-# Auth dependency for protected endpoints
-def verify_bearer_token(authorization: Optional[str] = Header(None)):
-    """Verify bearer token for protected endpoints."""
-    if not hasattr(settings, 'app_token') or not settings.app_token:
-        # No token configured, skip auth
-        return True
-
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required"
-        )
-
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
-        )
-
-    token = authorization.replace("Bearer ", "")
-    if token != settings.app_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-
-    return True
 
 def get_db() -> Session:
     """
@@ -197,7 +168,7 @@ async def get_config(config_id: int, db: Session = Depends(get_db)):
 async def create_config(
     new_config: ChatbotConfigCreate,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_bearer_token)
+    _: None = Depends(verify_bearer_token)
 ):
     """
     Create a new chatbot configuration.
@@ -258,7 +229,8 @@ async def create_config(
 async def update_config(
     config_id: int,
     config_update: ChatbotConfigUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
 ):
     """
     Update an existing chatbot configuration.
@@ -327,7 +299,11 @@ async def update_config(
 
 
 @router.delete("/{config_id}")
-async def delete_config(config_id: int, db: Session = Depends(get_db)):
+async def delete_config(
+    config_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
+):
     """
     Soft delete a chatbot configuration (set is_active=false).
 
