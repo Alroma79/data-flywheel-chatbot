@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Pass through environment variables from .env file if present
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key-for-testing}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./chatbot.db}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4o}
+      - DEFAULT_TEMPERATURE=${DEFAULT_TEMPERATURE:-0.7}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
+      - DEBUG=${DEBUG:-false}
+    # Optional: uncomment for development with live code changes
+    # volumes:
+    #   - ./backend:/app/backend
+    #   - ./frontend:/app/frontend
+    #   - ./tests:/app/tests
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Test service for running tests in isolation
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OPENAI_API_KEY=sk-test-key-for-testing
+      - DATABASE_URL=sqlite:///./test_chatbot.db
+      - DEFAULT_MODEL=gpt-4o
+      - DEFAULT_TEMPERATURE=0.7
+      - CORS_ORIGINS=["*"]
+      - DEBUG=true
+    command: ["pytest", "-q", "--tb=short"]
+    profiles:
+      - test

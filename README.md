@@ -1,6 +1,61 @@
 # Data Flywheel Chatbot 🤖
 
+[![CI](https://github.com/Alroma79/data-flywheel-chatbot/actions/workflows/ci.yml/badge.svg)](https://github.com/Alroma79/data-flywheel-chatbot/actions/workflows/ci.yml)
+
 A dynamic, configurable chatbot API built with FastAPI that supports multiple AI models, database persistence, and real-time configuration updates.
+
+## ⚡ 5-Minute Quickstart
+
+### 🐳 Docker Quickstart (Recommended)
+
+**Get the full chatbot running with Docker in 2 commands:**
+
+1. **Build and start:**
+   ```bash
+   docker compose up --build
+   ```
+
+2. **Open your browser:**
+   ```
+   http://localhost:8000/
+   ```
+
+3. **Run tests:**
+   ```bash
+   docker compose run --rm test
+   ```
+
+📖 **For detailed Docker guide:** [DOCS/04_docker_guide.md](DOCS%20AND%20PICS/04_docker_guide.md)
+
+### 🔧 Local Development Quickstart
+
+**Alternative: Run locally without Docker:**
+
+1. **Start the server:**
+   ```bash
+   cd backend && uvicorn app.main:app --reload
+   ```
+
+2. **Open your browser:**
+   ```
+   http://localhost:8000/
+   ```
+
+3. **Try the complete workflow:**
+   - Upload a knowledge file (TXT/PDF)
+   - Ask questions about the uploaded content
+   - See AI responses with source attribution
+   - Provide feedback with 👍/👎 buttons
+   - Load conversation history
+
+📖 **For detailed frontend documentation:** [DOCS/02_minimal_frontend.md](DOCS%20AND%20PICS/02_minimal_frontend.md)
+
+### 🎬 Demo & Resources
+
+- **📹 Demo GIF:** [90-second workflow demo](docs/demo.gif) *(Upload → Chat → Feedback → History)*
+- **🔗 API Collection:** [Postman Collection](docs/Flywheel.postman_collection.json) - Import for instant API testing
+- **🌱 Demo Seed:** Run `./scripts/seed_demo.sh` to populate with sample data
+- **🚀 Deploy to Railway:** [Railway Deployment Guide](DOCS%20AND%20PICS/DEPLOY_RAILWAY.md)
 
 ## 🚀 Features
 
@@ -11,6 +66,24 @@ A dynamic, configurable chatbot API built with FastAPI that supports multiple AI
 - **Input Validation**: Robust input sanitization and validation using Pydantic
 - **CORS Support**: Configurable CORS settings for frontend integration
 - **Docker Support**: Containerized deployment with Docker Compose
+
+## 🎯 Why These Choices?
+
+**Keyword/FTS Retrieval for Explainability:** Simple keyword matching provides transparent, debuggable knowledge retrieval with clear relevance scoring. Users can see exactly why specific sources were selected.
+
+**Framework-Free UI for Determinism:** Vanilla HTML/CSS/JavaScript eliminates framework complexity, ensures predictable behavior, and makes the codebase accessible to any developer regardless of framework preferences.
+
+**Docker for Reproducibility:** Containerization guarantees consistent deployment across environments, from local development to cloud production, with identical runtime behavior.
+
+**SQLite for Demo Speed:** File-based database enables instant setup without external dependencies, perfect for demos and development. Production deployments can easily switch to PostgreSQL.
+
+## 🔒 Security Notes
+
+- **Protected Endpoints:** `/api/v1/config` (POST) and `/api/v1/chat-history` (GET) require `Authorization: Bearer <APP_TOKEN>` header
+- **Knowledge Caps:** Maximum 3 knowledge sources per response, ~2.5k character context limit for safety
+- **CORS Configuration:** Restrict origins in production: `CORS_ORIGINS=["https://yourdomain.com"]`
+- **Input Validation:** All inputs sanitized and validated using Pydantic schemas
+- **Rate Limiting:** Configurable (not enforced by default)
 
 ## 🏗️ Architecture
 

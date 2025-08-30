@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     cors_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_METHODS")
     cors_headers: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_HEADERS")
 
+    # --- Security
+    app_token: Optional[str] = Field(default=None, alias="APP_TOKEN")
+
     # --- Rate limiting (not enforced yet)
     rate_limit_requests: int = Field(default=100, alias="RATE_LIMIT_REQUESTS")
     rate_limit_window: int = Field(default=3600, alias="RATE_LIMIT_WINDOW")  # seconds

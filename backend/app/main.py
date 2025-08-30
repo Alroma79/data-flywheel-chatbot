@@ -10,7 +10,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import os
 
 from .config import get_settings
 from .utils import setup_logging, format_error_response
@@ -79,15 +81,23 @@ app.include_router(router, prefix="/api/v1")
 app.include_router(configs_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 
+# Mount static files for frontend
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+    logger.info(f"Frontend mounted from: {frontend_path}")
+else:
+    logger.warning(f"Frontend directory not found: {frontend_path}")
 
-@app.get("/")
-async def root():
-    """Root endpoint providing API information."""
-    return {
-        "message": "Data Flywheel Chatbot API is running 🚀",
-        "version": settings.app_version,
-        "status": "healthy"
-    }
+    @app.get("/")
+    async def root():
+        """Root endpoint providing API information when frontend is not available."""
+        return {
+            "message": "Data Flywheel Chatbot API is running 🚀",
+            "version": settings.app_version,
+            "status": "healthy",
+            "note": "Frontend not found. API endpoints available at /api/v1/"
+        }
 
 
 @app.get("/health")
