@@ -181,10 +181,10 @@ This project was built for the Noxus AI interview process and demonstrates:
 ## 📞 Support
 
 ### Documentation
-- **Frontend Guide**: [DOCS/02_minimal_frontend.md](DOCS%20AND%20PICS/02_minimal_frontend.md)
-- **Validation Guide**: [DOCS/03_validation.md](DOCS%20AND%20PICS/03_validation.md)
-- **Docker Guide**: [DOCS/04_docker_guide.md](DOCS%20AND%20PICS/04_docker_guide.md)
-- **Railway Deployment**: [DOCS/DEPLOY_RAILWAY.md](DOCS%20AND%20PICS/DEPLOY_RAILWAY.md)
+- **Frontend Guide**: [docs/02_minimal_frontend.md](docs/02_minimal_frontend.md)
+- **Validation Guide**: [docs/03_validation.md](docs/03_validation.md)
+- **Docker Guide**: [docs/04_docker_guide.md](docs/04_docker_guide.md)
+- **Railway Deployment**: [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md)
 
 ### Resources
 - **API Collection**: [Postman Collection](docs/Flywheel.postman_collection.json)

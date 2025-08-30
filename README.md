@@ -25,7 +25,7 @@ A dynamic, configurable chatbot API built with FastAPI that supports multiple AI
    docker compose run --rm test
    ```
 
-📖 **For detailed Docker guide:** [DOCS/04_docker_guide.md](DOCS%20AND%20PICS/04_docker_guide.md)
+📖 **For detailed Docker guide:** [docs/04_docker_guide.md](docs/04_docker_guide.md)
 
 ### 🔧 Local Development Quickstart
 
@@ -48,14 +48,14 @@ A dynamic, configurable chatbot API built with FastAPI that supports multiple AI
    - Provide feedback with 👍/👎 buttons
    - Load conversation history
 
-📖 **For detailed frontend documentation:** [DOCS/02_minimal_frontend.md](DOCS%20AND%20PICS/02_minimal_frontend.md)
+📖 **For detailed frontend documentation:** [docs/02_minimal_frontend.md](docs/02_minimal_frontend.md)
 
 ### 🎬 Demo & Resources
 
 - **📹 Demo GIF:** [90-second workflow demo](docs/demo.gif) *(Upload → Chat → Feedback → History)*
 - **🔗 API Collection:** [Postman Collection](docs/Flywheel.postman_collection.json) - Import for instant API testing
 - **🌱 Demo Seed:** Run `./scripts/seed_demo.sh` to populate with sample data
-- **🚀 Deploy to Railway:** [Railway Deployment Guide](DOCS%20AND%20PICS/DEPLOY_RAILWAY.md)
+- **🚀 Deploy to Railway:** [Railway Deployment Guide](docs/DEPLOY_RAILWAY.md)
 
 ## 🚀 Features
 
