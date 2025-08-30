@@ -15,6 +15,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .config import get_settings
 from .utils import setup_logging, format_error_response
 from .routes import router
+from .routes_configs import router as configs_router
+from .routes_knowledge import router as knowledge_router
 
 # Initialize settings and logging
 settings = get_settings()
@@ -74,6 +76,8 @@ async def general_exception_handler(_: Request, exc: Exception):
 
 # Include API routes
 app.include_router(router, prefix="/api/v1")
+app.include_router(configs_router, prefix="/api/v1")
+app.include_router(knowledge_router, prefix="/api/v1")
 
 
 @app.get("/")

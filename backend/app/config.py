@@ -1,96 +1,87 @@
 """
 Configuration management for the Data Flywheel Chatbot application.
-
-This module handles loading and validation of environment variables
-and application settings.
+Loads & validates environment variables.
 """
 
-import os
+from functools import lru_cache
 from typing import List, Optional
-from pydantic import BaseSettings, validator
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
-    
-    # API Configuration
+    # --- Meta
     app_name: str = "Data Flywheel Chatbot API"
     app_version: str = "1.0.0"
     debug: bool = False
-    
-    # Database Configuration
-    database_url: str = "sqlite:///./chatbot.db"
-    
-    # OpenAI Configuration
-    openai_api_key: str
-    default_model: str = "gpt-4o"
-    default_temperature: float = 0.7
-    max_tokens: Optional[int] = None
-    
-    # CORS Configuration
-    cors_origins: List[str] = ["*"]
-    cors_credentials: bool = True
-    cors_methods: List[str] = ["*"]
-    cors_headers: List[str] = ["*"]
-    
-    # API Rate Limiting
-    rate_limit_requests: int = 100
-    rate_limit_window: int = 3600  # 1 hour in seconds
-    
-    # Logging Configuration
-    log_level: str = "INFO"
-    log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
-    @validator("cors_origins", pre=True)
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from comma-separated string or list."""
+
+    # --- Database
+    # note: prefer absolute path for sqlite in prod; keep as-is for dev
+    database_url: str = Field(default="sqlite:///./chatbot.db", alias="DATABASE_URL")
+
+    # --- OpenAI
+    openai_api_key: str = Field(alias="OPENAI_API_KEY")
+    default_model: str = Field(default="gpt-4o", alias="DEFAULT_MODEL")
+    default_temperature: float = Field(default=0.7, alias="DEFAULT_TEMPERATURE")
+    max_tokens: Optional[int] = Field(default=None, alias="MAX_TOKENS")
+
+    # --- CORS
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
+    cors_credentials: bool = Field(default=True, alias="CORS_CREDENTIALS")
+    cors_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_METHODS")
+    cors_headers: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_HEADERS")
+
+    # --- Rate limiting (not enforced yet)
+    rate_limit_requests: int = Field(default=100, alias="RATE_LIMIT_REQUESTS")
+    rate_limit_window: int = Field(default=3600, alias="RATE_LIMIT_WINDOW")  # seconds
+
+    # --- Logging
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    log_format: str = Field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        alias="LOG_FORMAT",
+    )
+
+    # Pydantic v2 config
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ----- Validators (v2 style) -----
+    @field_validator("cors_origins", "cors_methods", "cors_headers", mode="before")
+    @classmethod
+    def _parse_csv_to_list(cls, v):
+        # Accept comma-separated string or list
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            return [item.strip() for item in v.split(",") if item.strip()]
         return v
-    
-    @validator("cors_methods", pre=True)
-    def parse_cors_methods(cls, v):
-        """Parse CORS methods from comma-separated string or list."""
-        if isinstance(v, str):
-            return [method.strip() for method in v.split(",")]
-        return v
-    
-    @validator("cors_headers", pre=True)
-    def parse_cors_headers(cls, v):
-        """Parse CORS headers from comma-separated string or list."""
-        if isinstance(v, str):
-            return [header.strip() for header in v.split(",")]
-        return v
-    
-    @validator("database_url")
-    def validate_database_url(cls, v):
-        """Validate database URL format."""
+
+    @field_validator("database_url")
+    @classmethod
+    def _require_db_url(cls, v: str) -> str:
         if not v:
             raise ValueError("DATABASE_URL is required")
         return v
-    
-    @validator("openai_api_key")
-    def validate_openai_api_key(cls, v):
-        """Validate OpenAI API key is provided."""
+
+    @field_validator("openai_api_key")
+    @classmethod
+    def _require_openai_key(cls, v: str) -> str:
         if not v:
             raise ValueError("OPENAI_API_KEY is required")
         return v
-    
-    class Config:
-        """Pydantic configuration."""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+
+    @field_validator("default_temperature")
+    @classmethod
+    def _check_temperature(cls, v: float) -> float:
+        if not (0 <= v <= 2):
+            raise ValueError("DEFAULT_TEMPERATURE must be between 0 and 2")
+        return v
 
 
-# Global settings instance
-settings = Settings()
-
-
+@lru_cache
 def get_settings() -> Settings:
-    """Get application settings instance."""
-    return settings
+    return Settings()
