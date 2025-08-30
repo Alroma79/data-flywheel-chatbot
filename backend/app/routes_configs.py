@@ -15,6 +15,7 @@ from math import ceil
 
 from .utils import setup_logging
 from .db import SessionLocal
+from .auth import verify_bearer_token
 from .models import ChatbotConfig
 from .schemas import (
     ChatbotConfigCreate, 
@@ -164,7 +165,11 @@ async def get_config(config_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ChatbotConfigOut, status_code=status.HTTP_201_CREATED)
-async def create_config(new_config: ChatbotConfigCreate, db: Session = Depends(get_db)):
+async def create_config(
+    new_config: ChatbotConfigCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
+):
     """
     Create a new chatbot configuration.
 
@@ -224,7 +229,8 @@ async def create_config(new_config: ChatbotConfigCreate, db: Session = Depends(g
 async def update_config(
     config_id: int,
     config_update: ChatbotConfigUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
 ):
     """
     Update an existing chatbot configuration.
@@ -293,7 +299,11 @@ async def update_config(
 
 
 @router.delete("/{config_id}")
-async def delete_config(config_id: int, db: Session = Depends(get_db)):
+async def delete_config(
+    config_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
+):
     """
     Soft delete a chatbot configuration (set is_active=false).
 

@@ -17,6 +17,8 @@ from .utils import setup_logging, validate_openai_response, sanitize_user_input,
 from .db import SessionLocal
 from .models import ChatHistory, Feedback, ChatbotConfig
 from .schemas import ChatRequest, FeedbackCreate, ChatbotConfigCreate, ChatbotConfigOut
+from .knowledge_processor import KnowledgeProcessor
+from .auth import verify_bearer_token
 
 # Initialize settings and logging
 settings = get_settings()
@@ -25,6 +27,8 @@ logger = setup_logging()
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.openai_api_key)
 router = APIRouter(tags=["chatbot"])
+
+
 
 def get_db() -> Session:
     """
@@ -162,14 +166,14 @@ async def get_feedback(
 @router.post("/chat")
 async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
     """
-    Process a chat message using the configured AI model.
+    Process a chat message using the configured AI model with knowledge integration.
 
     Args:
         request: Chat request containing user message
         db: Database session dependency
 
     Returns:
-        AI response to the user message
+        AI response to the user message, potentially enhanced with knowledge base content
 
     Raises:
         HTTPException: If chat processing fails
@@ -185,22 +189,40 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
                 detail="Message cannot be empty"
             )
 
+        # Search knowledge base for relevant information
+        knowledge_processor = KnowledgeProcessor()
+        knowledge_snippets = knowledge_processor.search_knowledge(sanitized_message, db)
+
+        logger.info(f"Found {len(knowledge_snippets)} relevant knowledge snippets")
+
         # Load latest chatbot configuration
         config = db.query(ChatbotConfig).order_by(ChatbotConfig.updated_at.desc()).first()
 
         if config:
-            system_prompt = config.config_json.get("system_prompt", settings.default_model)
+            base_system_prompt = config.config_json.get("system_prompt", "You are a helpful and adaptive assistant.")
             temperature = config.config_json.get("temperature", settings.default_temperature)
             model = config.config_json.get("model", settings.default_model)
             max_tokens = config.config_json.get("max_tokens", settings.max_tokens)
         else:
             # Use default configuration
-            system_prompt = "You are a helpful and adaptive assistant."
+            base_system_prompt = "You are a helpful and adaptive assistant."
             temperature = settings.default_temperature
             model = settings.default_model
             max_tokens = settings.max_tokens
 
+        # Enhance system prompt with knowledge context if available
+        system_prompt = base_system_prompt
+        if knowledge_snippets:
+            knowledge_context = "\n\nRelevant information from knowledge base:\n"
+            for i, snippet in enumerate(knowledge_snippets, 1):
+                knowledge_context += f"\n[Source: {snippet['filename']}]\n{snippet['content']}\n"
+
+            system_prompt += knowledge_context
+            system_prompt += "\nPlease use the above information to provide accurate and helpful responses. Always cite the source filename when referencing information from the knowledge base."
+
         logger.info(f"Using model: {model}, temperature: {temperature}")
+        if knowledge_snippets:
+            logger.info(f"Enhanced prompt with {len(knowledge_snippets)} knowledge snippets")
 
         # Create OpenAI chat completion
         completion_params = {
@@ -227,13 +249,27 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
 
         reply = response.choices[0].message.content
 
+        # Prepare response with knowledge sources if used
+        response_data = {"reply": reply}
+
+        if knowledge_snippets:
+            sources = []
+            for snippet in knowledge_snippets:
+                sources.append({
+                    "filename": snippet['filename'],
+                    "file_id": snippet['file_id'],
+                    "relevance_score": round(snippet['score'], 2)
+                })
+            response_data["knowledge_sources"] = sources
+            logger.info(f"Response enhanced with {len(sources)} knowledge sources")
+
         # Save chat interaction to database
         chat = ChatHistory(user_message=sanitized_message, bot_reply=reply)
         db.add(chat)
         db.commit()
 
         logger.info("Chat processed successfully")
-        return {"reply": reply}
+        return response_data
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -266,7 +302,8 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
 @router.get("/chat-history", response_model=List[dict])
 async def get_chat_history(
     limit: int = Query(10, ge=1, le=100, description="Number of chat history entries to retrieve"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_bearer_token)
 ):
     """
     Retrieve recent chat history.

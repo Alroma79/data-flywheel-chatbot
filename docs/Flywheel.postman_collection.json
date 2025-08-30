@@ -1,0 +1,279 @@
+{
+  "info": {
+    "name": "Data Flywheel Chatbot API",
+    "description": "Complete API collection for the Data Flywheel Chatbot with knowledge integration, chat functionality, and feedback system.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiUrl",
+      "value": "{{baseUrl}}/api/v1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Check if the server is running and healthy"
+      },
+      "response": []
+    },
+    {
+      "name": "Chat with AI",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"What is a data flywheel and how does it work?\"\n}"
+        },
+        "url": {
+          "raw": "{{apiUrl}}/chat",
+          "host": ["{{apiUrl}}"],
+          "path": ["chat"]
+        },
+        "description": "Send a message to the AI chatbot. If knowledge files are uploaded, the response may include source attribution."
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Knowledge File",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "docs/sample_knowledge.txt",
+              "description": "Upload a TXT or PDF file to the knowledge base"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{apiUrl}}/knowledge/files",
+          "host": ["{{apiUrl}}"],
+          "path": ["knowledge", "files"]
+        },
+        "description": "Upload a knowledge file (TXT or PDF) that the chatbot can reference in responses"
+      },
+      "response": []
+    },
+    {
+      "name": "List Knowledge Files",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{apiUrl}}/knowledge/files",
+          "host": ["{{apiUrl}}"],
+          "path": ["knowledge", "files"]
+        },
+        "description": "Get a list of all uploaded knowledge files"
+      },
+      "response": []
+    },
+    {
+      "name": "Submit Feedback",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"What is a data flywheel and how does it work?\",\n  \"user_feedback\": \"thumbs_up\",\n  \"comment\": \"Great explanation with good source attribution!\"\n}"
+        },
+        "url": {
+          "raw": "{{apiUrl}}/feedback",
+          "host": ["{{apiUrl}}"],
+          "path": ["feedback"]
+        },
+        "description": "Submit feedback for a chatbot response. Feedback can be 'thumbs_up' or 'thumbs_down' with an optional comment."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Chat History",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{apiUrl}}/chat-history?limit=10",
+          "host": ["{{apiUrl}}"],
+          "path": ["chat-history"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Number of recent conversations to retrieve (1-100)"
+            }
+          ]
+        },
+        "description": "Retrieve recent chat history with configurable limit"
+      },
+      "response": []
+    },
+    {
+      "name": "Create Chatbot Configuration",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"production_config\",\n  \"config_json\": {\n    \"system_prompt\": \"You are a helpful AI assistant specializing in data analysis and business intelligence. Always provide accurate, well-sourced information.\",\n    \"model\": \"gpt-4o\",\n    \"temperature\": 0.7,\n    \"max_tokens\": 1000\n  },\n  \"is_active\": true,\n  \"tags\": [\"production\", \"data-analysis\"]\n}"
+        },
+        "url": {
+          "raw": "{{apiUrl}}/config",
+          "host": ["{{apiUrl}}"],
+          "path": ["config"]
+        },
+        "description": "Create a new chatbot configuration with custom system prompt, model settings, and metadata"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Chatbot Configurations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{apiUrl}}/configs?limit=10&page=1",
+          "host": ["{{apiUrl}}"],
+          "path": ["configs"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Number of configurations per page"
+            },
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Page number for pagination"
+            }
+          ]
+        },
+        "description": "Retrieve chatbot configurations with pagination"
+      },
+      "response": []
+    },
+    {
+      "name": "Demo Workflow - Complete Flow",
+      "item": [
+        {
+          "name": "1. Upload Sample Knowledge",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "docs/sample_knowledge.txt"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{apiUrl}}/knowledge/files",
+              "host": ["{{apiUrl}}"],
+              "path": ["knowledge", "files"]
+            }
+          }
+        },
+        {
+          "name": "2. Ask Knowledge-Based Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What are the key components of a data flywheel?\"\n}"
+            },
+            "url": {
+              "raw": "{{apiUrl}}/chat",
+              "host": ["{{apiUrl}}"],
+              "path": ["chat"]
+            }
+          }
+        },
+        {
+          "name": "3. Submit Positive Feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What are the key components of a data flywheel?\",\n  \"user_feedback\": \"thumbs_up\",\n  \"comment\": \"Excellent response with clear source attribution!\"\n}"
+            },
+            "url": {
+              "raw": "{{apiUrl}}/feedback",
+              "host": ["{{apiUrl}}"],
+              "path": ["feedback"]
+            }
+          }
+        },
+        {
+          "name": "4. View Chat History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiUrl}}/chat-history?limit=5",
+              "host": ["{{apiUrl}}"],
+              "path": ["chat-history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Complete demo workflow showing the full chatbot functionality"
+    }
+  ]
+}
