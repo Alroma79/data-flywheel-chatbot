@@ -5,7 +5,7 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -33,19 +33,24 @@ jobs:
           -e OPENAI_API_KEY=sk-test-key-for-testing \
           -e DATABASE_URL=sqlite:///./test_chatbot.db \
           -e DEBUG=true \
-          flywheel:test pytest -q --tb=short
+          -e PYTHONPATH=/app/backend \
+          flywheel:test python -m pytest tests/ -q --tb=short
           
     - name: Test Docker Compose
       run: |
         echo "OPENAI_API_KEY=sk-test-key-for-testing" > .env.test
-        docker compose -f docker-compose.yml --env-file .env.test run --rm test
+        echo "DATABASE_URL=sqlite:///./test_chatbot.db" >> .env.test
+        echo "DEBUG=true" >> .env.test
+        docker compose --env-file .env.test run --rm test
         
     - name: Verify application starts
       run: |
         docker run -d --name test-app -p 8000:8000 \
           -e OPENAI_API_KEY=sk-test-key-for-testing \
+          -e DATABASE_URL=sqlite:///./test_chatbot.db \
+          -e DEBUG=true \
           flywheel:test
-        sleep 10
-        curl -f http://localhost:8000/health
+        sleep 15
+        curl -f http://localhost:8000/health || (docker logs test-app && exit 1)
         docker stop test-app
         docker rm test-app

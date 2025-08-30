@@ -38,6 +38,7 @@ services:
       - DEFAULT_TEMPERATURE=0.7
       - CORS_ORIGINS=["*"]
       - DEBUG=true
-    command: ["pytest", "-q", "--tb=short"]
+    command: ["python", "-m", "pytest", "tests/", "-q", "--tb=short"]
+    working_dir: /app
     profiles:
       - test
