@@ -24,6 +24,11 @@ from .routes_knowledge import router as knowledge_router
 settings = get_settings()
 logger = setup_logging()
 
+# Debug CORS settings
+logger.info(f"CORS origins: {settings.cors_origins}")
+logger.info(f"CORS methods: {settings.cors_methods}")
+logger.info(f"CORS headers: {settings.cors_headers}")
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.app_name,
@@ -32,14 +37,15 @@ app = FastAPI(
     debug=settings.debug
 )
 
-# Configure CORS middleware
+# Configure CORS middleware - Override with explicit origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins,   # <-- use settings, not a hardcoded list
     allow_credentials=settings.cors_credentials,
     allow_methods=settings.cors_methods,
     allow_headers=settings.cors_headers,
 )
+logger.info(f"CORS configured for origins: {settings.cors_origins}")
 
 
 @app.exception_handler(StarletteHTTPException)

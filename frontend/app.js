@@ -3,11 +3,12 @@
  * Simple vanilla JavaScript application for chatbot interaction
  */
 
-// API helper functions
+// API helper functions - UPDATED FOR BACKEND
 const api = {
-    baseUrl: '/api/v1',
+    baseUrl: 'http://localhost:8000/api/v1',
     
     async post(path, body) {
+        console.log('API POST to:', `${this.baseUrl}${path}`);
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
             headers: {
@@ -19,6 +20,7 @@ const api = {
     },
     
     async postFile(path, formData) {
+        console.log('API POST FILE to:', `${this.baseUrl}${path}`);
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
             body: formData

@@ -5,7 +5,7 @@ This module defines the database schema and models for storing
 chat history, user feedback, and chatbot configuration.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from datetime import datetime
 from .db import Base
@@ -40,19 +40,23 @@ class ChatHistory(Base):
 
     Attributes:
         id: Primary key identifier
-        user_message: The user's input message
-        bot_reply: The chatbot's response
-        timestamp: When the conversation occurred
+        session_id: Unique session identifier
+        role: Message role (user/assistant)
+        content: Message content
+        created_at: Timestamp of message
+        user_id: Optional user identifier
     """
     __tablename__ = "chat_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_message = Column(Text, nullable=False, comment="User's input message")
-    bot_reply = Column(Text, nullable=False, comment="Chatbot's response")
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), comment="Conversation timestamp")
+    session_id = Column(String(36), index=True, nullable=False, default='', comment="Session identifier")
+    role = Column(String(20), nullable=False, comment="Message role: 'user' or 'assistant'")
+    content = Column(Text, nullable=False, comment="Message content")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="Message timestamp")
+    user_id = Column(String(100), nullable=True, comment="Optional user identifier")
 
     def __repr__(self) -> str:
-        return f"<ChatHistory(id={self.id}, timestamp={self.timestamp})>"
+        return f"<ChatHistory(id={self.id}, role={self.role}, session_id={self.session_id})>"
 
 
 class ChatbotConfig(Base):

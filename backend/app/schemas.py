@@ -18,6 +18,8 @@ class ChatRequest(BaseModel):
 
     Attributes:
         message: The user's chat message (1-4000 characters)
+        session_id: Optional session identifier for multi-turn conversations
+        user_id: Optional user identifier
     """
     message: str = Field(
         ...,
@@ -25,6 +27,16 @@ class ChatRequest(BaseModel):
         max_length=4000,
         description="User's chat message",
         example="Hello, how can you help me today?"
+    )
+    session_id: Optional[str] = Field(
+        None,
+        description="Session identifier for continuing conversations",
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="Optional user identifier",
+        example="user123"
     )
 
     @field_validator('message', mode='before')

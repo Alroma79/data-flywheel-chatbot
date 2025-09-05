@@ -1,0 +1,8 @@
+fastapi
+sqlalchemy
+pydantic
+openai
+pytest
+httpx
+python-jose
+passlib

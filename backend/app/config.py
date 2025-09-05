@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import uuid
 
 
 class Settings(BaseSettings):
@@ -18,7 +19,11 @@ class Settings(BaseSettings):
 
     # --- Database
     # note: prefer absolute path for sqlite in prod; keep as-is for dev
-    database_url: str = Field(default="sqlite:///./chatbot.db", alias="DATABASE_URL")
+    database_url: str = Field(default="sqlite:///./backend/chatbot.db", alias="DATABASE_URL")
+
+    @classmethod
+    def _override_database_url(cls, url):
+        cls.database_url = url
 
     # --- OpenAI
     openai_api_key: str = Field(alias="OPENAI_API_KEY")
@@ -34,6 +39,9 @@ class Settings(BaseSettings):
     cors_credentials: bool = Field(default=True, alias="CORS_CREDENTIALS")
     cors_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_METHODS")
     cors_headers: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_HEADERS")
+
+    # --- Chat Settings
+    max_context_messages: int = Field(default=10, alias="MAX_CONTEXT_MESSAGES", description="Maximum number of messages to include in context window")
 
     # --- Security
     app_token: Optional[str] = Field(default=None, alias="APP_TOKEN")

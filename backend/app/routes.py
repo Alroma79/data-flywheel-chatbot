@@ -5,12 +5,15 @@ This module contains all the API endpoints for chat functionality,
 feedback collection, configuration management, and chat history.
 """
 
-from typing import List
+from typing import List, Optional
 from openai import OpenAI
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+import uuid
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, desc
+import uuid
 
 from .config import get_settings
 from .utils import setup_logging, validate_openai_response, sanitize_user_input, format_error_response
@@ -25,7 +28,8 @@ settings = get_settings()
 logger = setup_logging()
 
 # Initialize OpenAI client
-client = OpenAI(api_key=settings.openai_api_key)
+local_settings = get_settings()
+client = OpenAI(api_key=local_settings.openai_api_key)
 router = APIRouter(tags=["chatbot"])
 
 
@@ -165,6 +169,7 @@ async def get_feedback(
 # -------------------------------
 @router.post("/chat")
 async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
+    local_settings = get_settings()
     """
     Process a chat message using the configured AI model with knowledge integration.
 
@@ -200,15 +205,15 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
 
         if config:
             base_system_prompt = config.config_json.get("system_prompt", "You are a helpful and adaptive assistant.")
-            temperature = config.config_json.get("temperature", settings.default_temperature)
-            model = config.config_json.get("model", settings.default_model)
-            max_tokens = config.config_json.get("max_tokens", settings.max_tokens)
+            temperature = config.config_json.get("temperature", local_settings.default_temperature)
+            model = config.config_json.get("model", local_settings.default_model)
+            max_tokens = config.config_json.get("max_tokens", local_settings.max_tokens)
         else:
             # Use default configuration
             base_system_prompt = "You are a helpful and adaptive assistant."
-            temperature = settings.default_temperature
-            model = settings.default_model
-            max_tokens = settings.max_tokens
+            temperature = local_settings.default_temperature
+            model = local_settings.default_model
+            max_tokens = local_settings.max_tokens
 
         # Enhance system prompt with knowledge context if available
         system_prompt = base_system_prompt
@@ -224,13 +229,33 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         if knowledge_snippets:
             logger.info(f"Enhanced prompt with {len(knowledge_snippets)} knowledge snippets")
 
+        # Load conversation history for the session
+        local_settings = get_settings()
+        # Handle context window retrieval for both session-based and default queries
+        if request.session_id:
+            context_window = (
+                db.query(ChatHistory)
+                .filter(ChatHistory.session_id == request.session_id)
+                .order_by(ChatHistory.created_at.desc())
+                .limit(local_settings.max_context_messages * 2)  # Allow for user + assistant messages
+                .all()[::-1]  # Reverse to maintain chronological order
+            )
+        else:
+            context_window = []  # No context for new conversations
+
+        # Create messages for OpenAI completion
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in context_window:
+            messages.append({
+                "role": msg.role, 
+                "content": msg.content
+            })
+        messages.append({"role": "user", "content": sanitized_message})
+
         # Create OpenAI chat completion
         completion_params = {
             "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": sanitized_message}
-            ],
+            "messages": messages,
             "temperature": temperature,
         }
 
@@ -263,13 +288,27 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
             response_data["knowledge_sources"] = sources
             logger.info(f"Response enhanced with {len(sources)} knowledge sources")
 
-        # Save chat interaction to database
-        chat = ChatHistory(user_message=sanitized_message, bot_reply=reply)
-        db.add(chat)
+        # Save user message to database
+        user_chat = ChatHistory(
+            session_id=request.session_id or str(uuid.uuid4()), 
+            role='user', 
+            content=sanitized_message,
+            user_id=request.user_id
+        )
+        db.add(user_chat)
+        db.flush()  # Get the ID without committing
+
+        # Save assistant reply to database
+        assistant_chat = ChatHistory(
+            session_id=user_chat.session_id, 
+            role='assistant', 
+            content=reply
+        )
+        db.add(assistant_chat)
         db.commit()
 
-        logger.info("Chat processed successfully")
-        return response_data
+        logger.info(f"Chat processed successfully. Session ID: {user_chat.session_id}")
+        return {**response_data, "session_id": user_chat.session_id}
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -352,6 +391,69 @@ async def get_chat_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred"
+        )
+
+# -------------------------------
+# Sessions Endpoints
+# -------------------------------
+@router.get("/sessions", response_model=List[dict])
+async def list_sessions(
+    limit: int = Query(10, ge=1, le=100, description="Number of sessions to return"),
+    db: Session = Depends(get_db)
+):
+    """Retrieves a list of recent chat sessions.
+
+    Args:
+        limit: Maximum number of sessions to return
+        db: Database session
+
+    Returns:
+        List of sessions with their last interaction time
+    """
+    try:
+        sessions = (
+            db.query(ChatHistory.session_id, func.max(ChatHistory.created_at).label("last_at"))
+            .group_by(ChatHistory.session_id)
+            .order_by(desc("last_at"))
+            .limit(limit)
+            .all()
+        )
+
+        return [
+            {"session_id": session_id, "last_at": last_at.isoformat()}
+            for session_id, last_at in sessions
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error while retrieving sessions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list sessions"
+        )
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str, 
+    db: Session = Depends(get_db)
+):
+    """Deletes all messages for a specific session.
+
+    Args:
+        session_id: Session to delete
+        db: Database session
+
+    Returns:
+        Confirmation of deletion
+    """
+    try:
+        db.query(ChatHistory).filter(ChatHistory.session_id == session_id).delete()
+        db.commit()
+        return {"status": "deleted", "session_id": session_id}
+    except SQLAlchemyError as e:
+        logger.error(f"Database error while deleting session: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete session"
         )
 
 # -------------------------------

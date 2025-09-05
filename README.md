@@ -248,6 +248,56 @@ Run tests using pytest:
 pytest tests/
 ```
 
+## 💬 Multi-turn Validation + Troubleshooting
+
+### Overview
+The chatbot supports multi-turn conversations using session-based chat history. Each conversation maintains context across multiple messages through a unique session ID.
+
+### Database Schema
+The chat_history table uses the following schema:
+- `id`: Primary key identifier
+- `session_id`: Unique session identifier (UUID)
+- `role`: Message role ('user' or 'assistant')
+- `content`: Message content
+- `created_at`: Timestamp of message creation
+- `user_id`: Optional user identifier
+
+### Validation Tests
+Test coverage includes:
+1. **Session Generation**: First `/api/v1/chat` call without session_id returns new session_id
+2. **Context Preservation**: Subsequent calls with same session_id maintain conversation context
+3. **Session Management**: `/api/v1/sessions` endpoints for listing and deleting sessions
+
+### Troubleshooting
+
+#### Common Issues
+
+**Issue: "No session_id returned"**
+- **Cause**: Database migration not applied or OpenAI mock failing
+- **Solution**: Run `python -c "from app.migrations.add_session_columns import run_migration; run_migration('backend/chatbot.db')"`
+
+**Issue: "Context not maintained across turns"**
+- **Cause**: Session ID not properly stored or retrieved
+- **Solution**: Check database contains messages with matching session_id: `sqlite3 backend/chatbot.db "SELECT * FROM chat_history WHERE session_id='<your_session_id>';"`
+
+**Issue: "Tests failing with import errors"**
+- **Cause**: Incorrect Python path or module imports
+- **Solution**: Ensure tests run from backend directory: `cd backend && python -m pytest tests/test_chat_sessions.py -v`
+
+#### Database Validation
+Check chat_history schema:
+```bash
+sqlite3 backend/chatbot.db "PRAGMA table_info(chat_history);"
+```
+
+Expected output should include columns: id, session_id, role, content, created_at, user_id
+
+#### End-to-End Test
+1. Send first message: `curl -X POST "http://localhost:8000/api/v1/chat" -H "Content-Type: application/json" -d '{"message": "Hello"}'`
+2. Extract session_id from response
+3. Send follow-up: `curl -X POST "http://localhost:8000/api/v1/chat" -H "Content-Type: application/json" -d '{"message": "What did I just say?", "session_id": "<session_id>"}'`
+4. Verify response acknowledges previous message
+
 ## 📝 Development
 
 ### Code Style

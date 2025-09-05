@@ -1,0 +1,136 @@
+# Multi-Turn Conversation Implementation
+
+## Overview
+This document explains the implementation of multi-turn conversation support in the Data Flywheel Chatbot, focusing on session tracking, context preservation, and database design.
+
+## 1. Database Model Changes
+File: backend/app/models.py
+
+### Before:
+```python
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    id = Column(Integer, primary_key=True, index=True)
+    user_message = Column(Text, nullable=False)
+    bot_reply = Column(Text, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+```
+
+### After:
+```python
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(36), index=True, nullable=False, default='')
+    role = Column(String(20), nullable=False)  # 'user' or 'assistant'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user_id = Column(String(100), nullable=True)
+```
+
+### Key Changes:
+- Added `session_id` to track conversation context
+- Introduced `role` to distinguish between user and assistant messages
+- Replaced specific message columns with a generic `content` column
+- Added optional `user_id` for future user-specific tracking
+
+## 2. Database Migration Strategy
+File: backend/app/migrations/add_session_columns.py
+
+The migration script handles:
+- Checking existing table structure
+- Adding new columns dynamically
+- Migrating existing data to the new schema
+- Handling potential database schema changes
+
+Key migration steps:
+1. Check existing columns
+2. Add missing columns with appropriate defaults
+3. Preserve existing data during migration
+4. Create index on `session_id` for performance
+
+## 3. Chat Endpoint Logic
+File: backend/app/routes.py
+
+### Session ID Generation
+```python
+# Generate session_id if not provided
+session_id = request.session_id or str(uuid.uuid4())
+```
+
+### Conversation History Retrieval
+```python
+context_window = (
+    db.query(ChatHistory)
+    .filter(ChatHistory.session_id == request.session_id)
+    .order_by(ChatHistory.created_at.asc())
+    .limit(local_settings.max_context_messages * 2)
+    .all()
+)
+```
+
+### Message Preparation for LLM
+```python
+messages = [{"role": "system", "content": system_prompt}]
+for msg in context_window:
+    messages.append({
+        "role": msg.role, 
+        "content": msg.content
+    })
+messages.append({"role": "user", "content": sanitized_message})
+```
+
+## 4. Testing Strategy
+File: backend/tests/test_chat_sessions.py
+
+Tests cover three key scenarios:
+1. Chat without session ID
+   - Generates a new session ID
+   - Ensures non-empty response
+
+2. Multi-turn Conversation
+   - Maintains consistent session ID across turns
+   - Preserves conversation context
+
+3. Sessions Endpoints
+   - List recent sessions
+   - Delete specific sessions
+
+### Mocking Strategy
+- Mock OpenAI API calls
+- Mock knowledge processor
+- Use test database
+
+## 5. Configuration
+File: backend/app/config.py
+
+Added configuration for context window:
+```python
+max_context_messages: int = Field(
+    default=10, 
+    alias="MAX_CONTEXT_MESSAGES", 
+    description="Maximum number of messages to include in context window"
+)
+```
+
+## Key Benefits of Implementation
+- Dynamic session tracking
+- Flexible conversation context
+- Scalable database design
+- Easy session management
+- Configurable context window
+
+## Future Improvements
+- Implement session expiration
+- Add more sophisticated context management
+- Implement token-based context truncation
+- Add more comprehensive session analytics
+
+## Potential Challenges Addressed
+- Preventing context window from growing indefinitely
+- Handling conversations without explicit session tracking
+- Supporting both stateful and stateless conversation modes
+
+---
+
+Note: This implementation provides a lightweight, flexible approach to multi-turn conversations that can be easily extended or modified based on specific requirements.
