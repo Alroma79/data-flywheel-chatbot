@@ -25,19 +25,28 @@ class ChatRequest(BaseModel):
         ...,
         min_length=1,
         max_length=4000,
-        description="User's chat message",
-        example="Hello, how can you help me today?"
+        description="User's chat message"
     )
     session_id: Optional[str] = Field(
         None,
-        description="Session identifier for continuing conversations",
-        example="550e8400-e29b-41d4-a716-446655440000"
+        description="Session identifier for continuing conversations"
     )
     user_id: Optional[str] = Field(
         None,
-        description="Optional user identifier",
-        example="user123"
+        description="Optional user identifier"
     )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "message": "Hello, how can you help me today?",
+                    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "user_id": "user123"
+                }
+            ]
+        }
+    }
 
     @field_validator('message', mode='before')
     @classmethod
@@ -102,18 +111,11 @@ class ChatbotConfigBase(BaseModel):
         ...,
         min_length=1,
         max_length=100,
-        description="Configuration name",
-        example="production_config"
+        description="Configuration name"
     )
     config_json: Dict[str, Any] = Field(
         ...,
-        description="JSON configuration data",
-        example={
-            "system_prompt": "You are a helpful assistant.",
-            "model": "gpt-4o",
-            "temperature": 0.7,
-            "max_tokens": 1000
-        }
+        description="JSON configuration data"
     )
     is_active: bool = Field(
         True,
@@ -121,9 +123,26 @@ class ChatbotConfigBase(BaseModel):
     )
     tags: Optional[List[str]] = Field(
         None,
-        description="Optional tags for categorizing configurations",
-        example=["production", "customer-service"]
+        description="Optional tags for categorizing configurations"
     )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "production_config",
+                    "config_json": {
+                        "system_prompt": "You are a helpful assistant.",
+                        "model": "gpt-4o",
+                        "temperature": 0.7,
+                        "max_tokens": 1000
+                    },
+                    "is_active": True,
+                    "tags": ["production", "customer-service"]
+                }
+            ]
+        }
+    }
 
     @field_validator('config_json')
     @classmethod

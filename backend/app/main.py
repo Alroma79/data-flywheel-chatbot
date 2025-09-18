@@ -5,6 +5,7 @@ Initializes the FastAPI application with middleware, error handling, and routes.
 """
 
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -32,12 +33,31 @@ logger.info(f"CORS methods: {settings.cors_methods}")
 logger.info(f"CORS headers: {settings.cors_headers}")
 logger.info(f"App version: {settings.app_version} | Demo mode: {settings.demo_mode}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Startup complete.")
+    try:
+        did_seed = seed_demo()
+        if did_seed:
+            logger.info("Demo seed executed (DEMO_MODE=true).")
+        else:
+            logger.info("Demo seed skipped (DEMO_MODE=false).")
+    except Exception as e:
+        logger.warning(f"Demo seed error: {e}")
+
+    yield
+
+    # Shutdown (if needed)
+    logger.info("Application shutdown.")
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="A dynamic chatbot API with configurable AI models and database persistence",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 # CORS
@@ -105,15 +125,4 @@ def health():
 def version():
     return {"version": settings.app_version}
 
-@app.on_event("startup")
-async def _startup():
-    logger.info("Startup complete.")
-    try:
-        did_seed = seed_demo()
-        if did_seed:
-            logger.info("Demo seed executed (DEMO_MODE=true).")
-        else:
-            logger.info("Demo seed skipped (DEMO_MODE=false).")
-    except Exception as e:
-        logger.warning(f"Demo seed error: {e}")
 
