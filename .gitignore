@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+backend/.env
 
 # Python
 __pycache__/
@@ -71,8 +72,11 @@ logs/
 
 # Database files
 *.db
+*.db-journal
 *.sqlite3
 *.sqlite
+/db_backups/
+/_backup/
 
 # Docker
 .dockerignore
