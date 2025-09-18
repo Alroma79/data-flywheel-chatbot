@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/app:/app
       - ./frontend:/frontend
@@ -17,8 +17,6 @@ services:
       - DEFAULT_TEMPERATURE=${DEFAULT_TEMPERATURE:-0.7}
       - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
       - DEBUG=${DEBUG:-false}
-    ports:
-      - "8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -27,7 +25,23 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Optional test service
+  # PostgreSQL database service (optional - can be disabled by commenting out)
+  db:
+    image: postgres:14
+    container_name: postgres_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chatbot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    profiles:
+      - postgres
+
+  # Test service for running pytest in isolation
   test:
     build:
       context: .
@@ -45,3 +59,6 @@ services:
     command: ["python", "-m", "pytest", "/tests/", "-q", "--tb=short"]
     profiles:
       - test
+
+volumes:
+  postgres_data:

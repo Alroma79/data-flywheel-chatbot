@@ -6,7 +6,6 @@ feedback collection, configuration management, and chat history.
 """
 
 from typing import List, Optional
-from openai import OpenAI
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -16,20 +15,18 @@ from sqlalchemy import func, desc
 import uuid
 
 from .config import get_settings
-from .utils import setup_logging, validate_openai_response, sanitize_user_input, format_error_response
+from .utils import setup_logging, sanitize_user_input, format_error_response
 from .db import SessionLocal
 from .models import ChatHistory, Feedback, ChatbotConfig
 from .schemas import ChatRequest, FeedbackCreate, ChatbotConfigCreate, ChatbotConfigOut
 from .knowledge_processor import KnowledgeProcessor
 from .auth import verify_bearer_token
+from .services.llm import llm
 
 # Initialize settings and logging
 settings = get_settings()
 logger = setup_logging()
 
-# Initialize OpenAI client
-local_settings = get_settings()
-client = OpenAI(api_key=local_settings.openai_api_key)
 router = APIRouter(tags=["chatbot"])
 
 
@@ -243,36 +240,24 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         else:
             context_window = []  # No context for new conversations
 
-        # Create messages for OpenAI completion
+        # Create messages for LLM completion
         messages = [{"role": "system", "content": system_prompt}]
         for msg in context_window:
             messages.append({
-                "role": msg.role, 
+                "role": msg.role,
                 "content": msg.content
             })
         messages.append({"role": "user", "content": sanitized_message})
 
-        # Create OpenAI chat completion
-        completion_params = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-        }
+        # Use LLM wrapper for chat completion
+        llm_response = llm.chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
 
-        if max_tokens:
-            completion_params["max_tokens"] = max_tokens
-
-        response = client.chat.completions.create(**completion_params)
-
-        # Validate response
-        if not validate_openai_response(response):
-            logger.error("Invalid OpenAI response structure")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Invalid response from AI service"
-            )
-
-        reply = response.choices[0].message.content
+        reply = llm_response["content"]
 
         # Prepare response with knowledge sources if used
         response_data = {"reply": reply}

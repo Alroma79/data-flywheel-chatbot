@@ -14,8 +14,11 @@ import uuid
 class Settings(BaseSettings):
     # --- Meta
     app_name: str = "Data Flywheel Chatbot API"
-    app_version: str = "1.0.0"
-    debug: bool = False
+    debug: bool = Field(default=False, alias="DEBUG")
+    
+    # --- Demo Mode
+    demo_mode: bool = Field(default=False, alias="DEMO_MODE")
+    app_version: str = Field(default="v0.3-interview", alias="APP_VERSION")
 
     # --- Database
     # note: prefer absolute path for sqlite in prod; keep as-is for dev
@@ -96,6 +99,5 @@ class Settings(BaseSettings):
         return v
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()
