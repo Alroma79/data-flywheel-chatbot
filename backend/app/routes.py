@@ -21,7 +21,7 @@ from .models import ChatHistory, Feedback, ChatbotConfig
 from .schemas import ChatRequest, FeedbackCreate, ChatbotConfigCreate, ChatbotConfigOut
 from .knowledge_processor import KnowledgeProcessor
 from .auth import verify_bearer_token
-from .services.llm import llm
+from .services.llm import llm, chat
 
 # Initialize settings and logging
 settings = get_settings()
@@ -250,7 +250,7 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         messages.append({"role": "user", "content": sanitized_message})
 
         # Use LLM wrapper for chat completion
-        llm_response = llm.chat(
+        llm_response = await chat(
             messages=messages,
             model=model,
             temperature=temperature,
