@@ -43,7 +43,7 @@ async def llm(prompt: str, model: Optional[str] = None, temperature: float = 0.2
         # Never crash the API; surface a safe fallback.
         return f"[fallback-error: {type(e).__name__}] {prompt[:160]}"
 
-def chat(messages, **kwargs):
+async def chat(messages, **kwargs):
     # Convert messages to a single prompt
     prompt = '\n'.join([f"{msg['role']}: {msg['content']}" for msg in messages])
 
