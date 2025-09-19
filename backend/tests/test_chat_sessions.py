@@ -33,10 +33,19 @@ def mock_openai(monkeypatch):
     mock_knowledge_processor = MagicMock()
     mock_knowledge_processor.search_knowledge.return_value = []
     monkeypatch.setattr('backend.app.routes.KnowledgeProcessor', lambda: mock_knowledge_processor)
-    
-    # Patch the chat completions create method
-    with patch('backend.app.routes.client.chat.completions.create', side_effect=mock_openai_chat_completion) as mock_create:
-        yield mock_create
+
+    # Mock the LLM service to return test responses
+    def mock_llm_chat(messages, **kwargs):
+        user_message = messages[-1]['content'] if messages else "test"
+        return {
+            'content': f"Response to: {user_message}",
+            'usage': {'total_tokens': 10},
+            'latency_ms': 50
+        }
+
+    # Patch the llm service
+    monkeypatch.setattr('backend.app.routes.llm.chat', mock_llm_chat)
+    yield
 
 def test_chat_without_session_id(mock_openai):
     """Test that a chat without session_id generates a new session."""

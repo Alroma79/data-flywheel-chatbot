@@ -1,5 +1,12 @@
 # Docker Deployment Guide
 
+## Recent Changes
+**Updated September 2024**: Consolidated multiple docker-compose.yml files into a single configuration at repository root. The new compose file includes:
+- Main backend service with health checks
+- Optional PostgreSQL database service (using profiles)
+- Test service for automated testing
+- Improved volume mappings and environment variable handling
+
 ## Overview
 
 This guide covers containerizing and deploying the Data Flywheel Chatbot using Docker and Docker Compose. The containerized application maintains all functionality while providing consistent deployment across environments.

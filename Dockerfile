@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
-
+ENV PYTHONPATH=/app/backend
 # Install system dependencies for potential PDF processing
 # Keep minimal to maintain lean image
 RUN apt-get update && apt-get install -y \
