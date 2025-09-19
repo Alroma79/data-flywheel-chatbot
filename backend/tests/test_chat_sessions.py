@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..','..',)))
 
-from backend.app.main import app  # Relative import
+from app.main import app  # Relative import
 
 client = TestClient(app)
 
@@ -32,7 +32,7 @@ def mock_openai(monkeypatch):
     # Mock the knowledge processor to return an empty list
     mock_knowledge_processor = MagicMock()
     mock_knowledge_processor.search_knowledge.return_value = []
-    monkeypatch.setattr('backend.app.routes.KnowledgeProcessor', lambda: mock_knowledge_processor)
+    monkeypatch.setattr('app.routes.KnowledgeProcessor', lambda: mock_knowledge_processor)
 
     # Mock the LLM service to return test responses
     def mock_llm_chat(messages, **kwargs):
@@ -44,7 +44,7 @@ def mock_openai(monkeypatch):
         }
 
     # Patch the llm service
-    monkeypatch.setattr('backend.app.routes.llm.chat', mock_llm_chat)
+    monkeypatch.setattr('app.routes.llm.chat', mock_llm_chat)
     yield
 
 def test_chat_without_session_id(mock_openai):

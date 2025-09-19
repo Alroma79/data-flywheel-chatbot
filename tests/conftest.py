@@ -6,9 +6,15 @@ tests run in isolation with controlled environments.
 """
 
 import os
+import sys
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+
+# Add backend app to Python path for imports
+backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+sys.path.insert(0, backend_path)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -72,7 +78,7 @@ def mock_llm():
             'latency_ms': 50
         }
 
-    with patch('app.routes.llm.chat', side_effect=mock_chat):
+    with patch('app.services.llm.chat', side_effect=mock_chat):
         yield mock_chat
 
 
