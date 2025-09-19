@@ -12,6 +12,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 # Add backend app to Python path for imports
+backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+sys.path.insert(0, backend_path)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
@@ -37,7 +39,7 @@ def setup_test_environment():
 
     with patch.dict(os.environ, test_env):
         # Clear the settings cache to force reload with test environment
-        from backend.app.config import get_settings
+        from app.config import get_settings
         if hasattr(get_settings, 'cache_clear'):
             get_settings.cache_clear()
 
@@ -56,7 +58,7 @@ def test_client():
     This fixture creates a fresh TestClient instance for each test,
     ensuring test isolation.
     """
-    from backend.app.main import app
+    from app.main import app
     return TestClient(app)
 
 
@@ -125,7 +127,7 @@ def isolate_database():
     This fixture runs automatically and ensures database state
     doesn't leak between tests.
     """
-    from backend.app.db import engine, Base
+    from app.db import engine, Base
 
     # Create all tables
     Base.metadata.create_all(bind=engine)
