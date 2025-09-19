@@ -76,7 +76,7 @@ def mock_llm():
             'latency_ms': 50
         }
 
-    with patch('backend.app.routes.llm.chat', side_effect=mock_chat):
+    with patch('backend.app.services.llm.chat', side_effect=mock_chat):
         yield mock_chat
 
 
