@@ -36,9 +36,9 @@ logger.info(f"App version: {settings.app_version} | Demo mode: {settings.demo_mo
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Startup complete.")
+    logger.info("Application startup.")
     try:
-        did_seed = seed_demo()
+        did_seed = await seed_demo(app)
         if did_seed:
             logger.info("Demo seed executed (DEMO_MODE=true).")
         else:
@@ -124,5 +124,3 @@ def health():
 @app.get("/version")
 def version():
     return {"version": settings.app_version}
-
-

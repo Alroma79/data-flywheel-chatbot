@@ -8,7 +8,10 @@ import subprocess
 import sys
 import requests
 import time
-import os
+import os, pathlib
+BACKEND = pathlib.Path(__file__).parent / "backend"
+os.environ.setdefault("PYTHONPATH", str(BACKEND))
+
 
 def check_server_running():
     """Check if the server is running."""
