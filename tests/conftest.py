@@ -95,7 +95,7 @@ def mock_knowledge_processor():
     mock_processor = MagicMock()
     mock_processor.search_knowledge.return_value = []
 
-    with patch('backend.app.routes.KnowledgeProcessor', return_value=mock_processor):
+    with patch('app.routes.KnowledgeProcessor', return_value=mock_processor):
         yield mock_processor
 
 

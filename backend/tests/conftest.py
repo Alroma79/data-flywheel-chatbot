@@ -33,7 +33,7 @@ def setup_test_environment():
 
     with patch.dict(os.environ, test_env):
         # Clear the settings cache to force reload with test environment
-        from backend.app.config import get_settings
+        from app.config import get_settings
         if hasattr(get_settings, 'cache_clear'):
             get_settings.cache_clear()
 
@@ -52,7 +52,7 @@ def test_client():
     This fixture creates a fresh TestClient instance for each test,
     ensuring test isolation.
     """
-    from backend.app.main import app
+    from app.main import app
     return TestClient(app)
 
 
@@ -72,7 +72,7 @@ def mock_llm():
             'latency_ms': 50
         }
 
-    with patch('backend.app.routes.llm.chat', side_effect=mock_chat):
+    with patch('app.routes.llm.chat', side_effect=mock_chat):
         yield mock_chat
 
 
@@ -89,7 +89,7 @@ def mock_knowledge_processor():
     mock_processor = MagicMock()
     mock_processor.search_knowledge.return_value = []
 
-    with patch('backend.app.routes.KnowledgeProcessor', return_value=mock_processor):
+    with patch('app.routes.KnowledgeProcessor', return_value=mock_processor):
         yield mock_processor
 
 
@@ -121,7 +121,7 @@ def isolate_database():
     This fixture runs automatically and ensures database state
     doesn't leak between tests.
     """
-    from backend.app.db import engine, Base
+    from app.db import engine, Base
 
     # Create all tables
     Base.metadata.create_all(bind=engine)

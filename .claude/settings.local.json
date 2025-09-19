@@ -11,7 +11,9 @@
       "Bash(git fetch:*)",
       "Bash(git merge:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
