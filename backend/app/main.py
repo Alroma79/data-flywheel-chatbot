@@ -93,30 +93,7 @@ async def general_exception_handler(_: Request, exc: Exception):
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
     return JSONResponse(status_code=500, content=format_error_response(exc, include_details=settings.debug))
 
-# Routers
-app.include_router(router, prefix="/api/v1")
-app.include_router(configs_router, prefix="/api/v1")
-app.include_router(knowledge_router, prefix="/api/v1")
-
-# Static frontend mount (if present)
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
-    logger.info(f"Frontend mounted from: {frontend_path}")
-else:
-    logger.warning(f"Frontend directory not found: {frontend_path}")
-
-# Root endpoint (JSON fallback; may be shadowed if static is mounted at "/")
-@app.get("/")
-async def root():
-    return {
-        "message": "Data Flywheel Chatbot API is running 🚀",
-        "version": settings.app_version,
-        "status": "healthy",
-        "note": "API endpoints under /api/v1/",
-    }
-
-# Health & version
+# Health & version endpoints (defined before static file mounting to avoid conflicts)
 @app.get("/health")
 def health():
     return {"status": "ok", "demo_mode": settings.demo_mode, "version": settings.app_version}
@@ -124,3 +101,27 @@ def health():
 @app.get("/version")
 def version():
     return {"version": settings.app_version}
+
+# Routers
+app.include_router(router, prefix="/api/v1")
+app.include_router(configs_router, prefix="/api/v1")
+app.include_router(knowledge_router, prefix="/api/v1")
+
+# Database path logging for debugging
+import os
+masked_db_url = settings.database_url.replace(settings.database_url.split('/')[-1], "***") if 'sqlite' in settings.database_url.lower() else settings.database_url[:20] + "***"
+logger.info(f"Database URL (masked): {masked_db_url}")
+if settings.database_url.startswith('sqlite'):
+    # Extract and resolve SQLite file path
+    sqlite_path = settings.database_url.replace('sqlite:///', '')
+    absolute_path = os.path.abspath(sqlite_path)
+    logger.info(f"SQLite file path: {absolute_path}")
+    logger.info(f"SQLite file exists: {os.path.exists(absolute_path)}")
+
+# Static frontend mount (if present) - mounted last to avoid shadowing API endpoints
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+    logger.info(f"Frontend mounted from: {frontend_path}")
+else:
+    logger.warning(f"Frontend directory not found: {frontend_path}")

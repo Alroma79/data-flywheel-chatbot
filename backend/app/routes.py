@@ -347,7 +347,7 @@ async def get_chat_history(
 
         history = (
             db.query(ChatHistory)
-            .order_by(ChatHistory.timestamp.desc())
+            .order_by(ChatHistory.created_at.desc())
             .limit(limit)
             .all()
         )
@@ -355,9 +355,10 @@ async def get_chat_history(
         response_data = [
             {
                 "id": h.id,
-                "user_message": h.user_message,
-                "bot_reply": h.bot_reply,
-                "timestamp": h.timestamp.isoformat()
+                "session_id": h.session_id,
+                "role": h.role,
+                "content": h.content,
+                "created_at": h.created_at.isoformat()
             }
             for h in history
         ]
