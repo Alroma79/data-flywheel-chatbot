@@ -94,7 +94,7 @@ async def list_configs(
         pages = ceil(total / size) if total > 0 else 1
 
         response_data = {
-            "items": [ChatbotConfigOut.from_orm(config) for config in configs],
+            "items": [ChatbotConfigOut.from_orm(config).dict() for config in configs],
             "total": total,
             "page": page,
             "size": size,
