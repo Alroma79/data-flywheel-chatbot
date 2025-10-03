@@ -174,30 +174,108 @@ function addMessage(content, type, timestamp = null, sources = null, messageId =
 }
 
 // Chat functions
-async function sendMessage() {
+async function sendMessage(useStreaming = true) {
     const message = elements.messageInput.value.trim();
     if (!message) {
         showStatus('Please enter a message', 'error');
         return;
     }
-    
+
     // Add user message to chat
-    addMessage(message, 'user', new Date().toISOString());
+    const userMessageElement = addMessage(message, 'user', new Date().toISOString());
     elements.messageInput.value = '';
-    
+
     setLoading(true);
-    
+
+    // Non-streaming request
+    if (!useStreaming) {
+        try {
+            const response = await api.post('/chat', { message });
+
+            // Add assistant response
+            addMessage(
+                response.reply,
+                'assistant',
+                new Date().toISOString(),
+                response.knowledge_sources
+            );
+
+        } catch (error) {
+            showStatus(`Chat error: ${error.message}`, 'error');
+            addMessage('Sorry, I encountered an error processing your message.', 'assistant');
+        } finally {
+            setLoading(false);
+        }
+        return;
+    }
+
+    // Streaming request
     try {
-        const response = await api.post('/chat', { message });
-        
-        // Add assistant response
-        addMessage(
-            response.reply, 
-            'assistant', 
-            new Date().toISOString(),
-            response.knowledge_sources
-        );
-        
+        // Create placeholder for assistant response
+        const responseTimestamp = new Date().toISOString();
+        const assistantMessageElement = addMessage('', 'assistant', responseTimestamp);
+        const contentDiv = assistantMessageElement.querySelector('.message-content');
+        const knowledgeSourcesDiv = document.createElement('div');
+        knowledgeSourcesDiv.className = 'knowledge-sources';
+        assistantMessageElement.appendChild(knowledgeSourcesDiv);
+
+        // Stream setup
+        const response = await fetch(`${api.baseUrl}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message, stream: true })
+        });
+
+        // Check if response is okay
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Stream processing
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+
+                        // Update response text
+                        if (data.reply !== undefined) {
+                            contentDiv.textContent = data.reply;
+                            scrollToBottom();
+                        }
+
+                        // Update knowledge sources
+                        if (data.knowledge_sources) {
+                            knowledgeSourcesDiv.innerHTML = '<strong>Sources:</strong> ' +
+                                data.knowledge_sources.map(s =>
+                                    `<span class="knowledge-source">${s.filename} (${s.relevance_score})</span>`
+                                ).join('');
+                        }
+
+                        // Handle potential error response
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing stream data:', parseError);
+                    }
+                }
+            }
+        }
+
     } catch (error) {
         showStatus(`Chat error: ${error.message}`, 'error');
         addMessage('Sorry, I encountered an error processing your message.', 'assistant');

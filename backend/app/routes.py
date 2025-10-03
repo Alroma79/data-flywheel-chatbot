@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 import uuid
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func, desc
-import uuid
+import time
+import json
 
 from .config import get_settings
 from .utils import setup_logging, sanitize_user_input, format_error_response
@@ -164,14 +165,20 @@ async def get_feedback(
 # -------------------------------
 # Chat Endpoint with Dynamic Config
 # -------------------------------
-@router.post("/chat")
-async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
-    local_settings = get_settings()
+from fastapi import Request, Query
+from fastapi.responses import StreamingResponse
+
+@router.post("/chat", response_model=None)
+async def chat_with_bot(
+    request: ChatRequest,
+    db: Session = Depends(get_db)
+):
     """
     Process a chat message using the configured AI model with knowledge integration.
+    Supports both streaming and non-streaming responses.
 
     Args:
-        request: Chat request containing user message
+        request: Chat request containing user message and optional stream flag
         db: Database session dependency
 
     Returns:
@@ -181,7 +188,8 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         HTTPException: If chat processing fails
     """
     try:
-        logger.info("Processing chat request")
+        stream = request.stream or False
+        logger.info(f"Processing chat request (streaming: {stream})")
 
         # Sanitize user input
         sanitized_message = sanitize_user_input(request.message)
@@ -198,6 +206,7 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
         logger.info(f"Found {len(knowledge_snippets)} relevant knowledge snippets")
 
         # Load latest chatbot configuration
+        local_settings = get_settings()
         config = db.query(ChatbotConfig).order_by(ChatbotConfig.updated_at.desc()).first()
 
         if config:
@@ -227,8 +236,6 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
             logger.info(f"Enhanced prompt with {len(knowledge_snippets)} knowledge snippets")
 
         # Load conversation history for the session
-        local_settings = get_settings()
-        # Handle context window retrieval for both session-based and default queries
         if request.session_id:
             context_window = (
                 db.query(ChatHistory)
@@ -249,7 +256,105 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
             })
         messages.append({"role": "user", "content": sanitized_message})
 
-        # Use LLM wrapper for chat completion
+        # Save user message to database
+        user_chat = ChatHistory(
+            session_id=request.session_id or str(uuid.uuid4()),
+            role='user',
+            content=sanitized_message,
+            user_id=request.user_id
+        )
+        db.add(user_chat)
+        db.flush()  # Get the ID without committing
+
+        # Streaming response handling
+        if stream:
+            async def generate_response():
+                full_response = ""
+                response_data = {"reply": "", "session_id": user_chat.session_id}
+                start_time = time.time()
+                total_tokens = 0
+
+                # Enhanced knowledge sources for streaming
+                if knowledge_snippets:
+                    sources = []
+                    for snippet in knowledge_snippets:
+                        sources.append({
+                            "filename": snippet['filename'],
+                            "file_id": snippet['file_id'],
+                            "relevance_score": round(snippet['score'], 2)
+                        })
+                    response_data["knowledge_sources"] = sources
+
+                # Streaming event tracking
+                stream_error = False
+                try:
+                    async for token_or_metadata in await chat(
+                        messages=messages,
+                        model=model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=True
+                    ):
+                        # Handle tokens and metadata for streaming
+                        if isinstance(token_or_metadata, str):
+                            total_tokens += 1
+                            full_response += token_or_metadata
+                            response_data['reply'] = full_response
+                            yield f"data: {json.dumps(response_data)}\n\n"
+                        elif isinstance(token_or_metadata, dict):
+                            # Stream ended, commit chat history
+                            try:
+                                assistant_chat = ChatHistory(
+                                    session_id=user_chat.session_id,
+                                    role='assistant',
+                                    content=full_response
+                                )
+                                db.add(assistant_chat)
+                                db.commit()
+
+                                # Log streaming performance
+                                latency_ms = int((time.time() - start_time) * 1000)
+                                logger.info(
+                                    f"Streamed chat processed. "
+                                    f"Session: {user_chat.session_id}, "
+                                    f"Tokens: {total_tokens}, "
+                                    f"Latency: {latency_ms}ms"
+                                )
+                            except Exception as commit_error:
+                                logger.error(f"Database commit error: {commit_error}")
+                                stream_error = True
+
+                except Exception as stream_exception:
+                    # Handle streaming errors
+                    logger.error(f"Streaming error: {stream_exception}")
+                    stream_error = True
+                    error_data = {
+                        'error': 'Streaming failed',
+                        'details': str(stream_exception),
+                        'session_id': user_chat.session_id
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+
+                # Final error handling
+                if stream_error:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+
+            # Return Server-Sent Events (SSE) streaming response
+            headers = {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive"
+            }
+            return StreamingResponse(
+                generate_response(),
+                media_type="text/event-stream",
+                headers=headers
+            )
+
+        # Non-streaming response
         llm_response = await chat(
             messages=messages,
             model=model,
@@ -273,20 +378,10 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
             response_data["knowledge_sources"] = sources
             logger.info(f"Response enhanced with {len(sources)} knowledge sources")
 
-        # Save user message to database
-        user_chat = ChatHistory(
-            session_id=request.session_id or str(uuid.uuid4()), 
-            role='user', 
-            content=sanitized_message,
-            user_id=request.user_id
-        )
-        db.add(user_chat)
-        db.flush()  # Get the ID without committing
-
         # Save assistant reply to database
         assistant_chat = ChatHistory(
-            session_id=user_chat.session_id, 
-            role='assistant', 
+            session_id=user_chat.session_id,
+            role='assistant',
             content=reply
         )
         db.add(assistant_chat)

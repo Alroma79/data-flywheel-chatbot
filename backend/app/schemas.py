@@ -20,6 +20,7 @@ class ChatRequest(BaseModel):
         message: The user's chat message (1-4000 characters)
         session_id: Optional session identifier for multi-turn conversations
         user_id: Optional user identifier
+        stream: Optional flag to enable streaming response
     """
     message: str = Field(
         ...,
@@ -34,6 +35,10 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = Field(
         None,
         description="Optional user identifier"
+    )
+    stream: Optional[bool] = Field(
+        False,
+        description="Enable streaming response"
     )
 
     model_config = {
