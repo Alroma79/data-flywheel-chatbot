@@ -14,7 +14,6 @@ import logging
 from typing import AsyncGenerator, Dict, List, Optional, Union
 
 from fastapi import HTTPException
-from typing import List, Dict
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -55,8 +54,8 @@ async def llm(
 
     # --- Real provider path (OpenAI 1.x client) ---
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
         model = model or os.getenv("MODEL", "gpt-4o-mini")
 
         # Prepare OpenAI API call parameters
@@ -80,8 +79,8 @@ async def llm(
         if stream:
             async def token_generator():
                 try:
-                    resp = client.chat.completions.create(**api_params)
-                    for chunk in resp:
+                    resp = await client.chat.completions.create(**api_params)
+                    async for chunk in resp:
                         if chunk.choices[0].delta.content:
                             token = chunk.choices[0].delta.content
                             yield token
@@ -95,7 +94,7 @@ async def llm(
             return token_generator()
 
         # Non-Streaming Response
-        resp = client.chat.completions.create(**{k: v for k, v in api_params.items() if k != 'stream'})
+        resp = await client.chat.completions.create(**{k: v for k, v in api_params.items() if k != 'stream'})
         content = resp.choices[0].message.content
         return content or ""
 

@@ -264,7 +264,8 @@ async def chat_with_bot(
             user_id=request.user_id
         )
         db.add(user_chat)
-        db.flush()  # Get the ID without committing
+        db.commit()  # Commit user message before streaming to prevent data loss
+        db.refresh(user_chat)  # Refresh to get generated fields
 
         # Streaming response handling
         if stream:
