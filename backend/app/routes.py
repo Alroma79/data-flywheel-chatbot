@@ -422,8 +422,7 @@ async def chat_with_bot(
 @router.get("/chat-history", response_model=List[dict])
 async def get_chat_history(
     limit: int = Query(10, ge=1, le=100, description="Number of chat history entries to retrieve"),
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_bearer_token)
+    db: Session = Depends(get_db)
 ):
     """
     Retrieve recent chat history.
