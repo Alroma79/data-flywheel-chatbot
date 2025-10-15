@@ -165,3 +165,50 @@ Key models:
 - OpenAI API rate limits
 - Database query optimization for chat history
 - Static file caching for frontend assets
+
+## Streaming Chat Response
+
+### Overview
+The Data Flywheel Chatbot now supports streaming chat responses, providing real-time, token-by-token message generation.
+
+### Key Features
+- Progressive token rendering
+- Real-time knowledge source updates
+- Fallback to traditional response mode
+- Minimal performance overhead
+
+### Streaming Endpoint Usage
+The `/api/v1/chat` endpoint supports streaming via the `stream` parameter:
+
+```python
+# JavaScript/Frontend Example
+const response = await fetch('/api/v1/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        message: "Your chat message",
+        stream: true  // Enable streaming
+    })
+});
+```
+
+### Streaming Response Format
+Responses are delivered as Server-Sent Events (SSE) with JSON-encoded messages:
+- `reply`: Incrementally updated response text
+- `knowledge_sources`: Dynamic source attribution
+- `session_id`: Tracking conversation context
+
+### Benefits
+- Improved user experience with real-time typing effect
+- Lower perceived latency
+- Instant feedback during response generation
+
+### Compatibility
+- Supports all existing chat configurations
+- Works with knowledge base integration
+- Compatible with current frontend and backend architectures
+
+### Performance Optimization
+- Minimal additional computational overhead
+- Efficient token-level processing
+- Configurable streaming behavior

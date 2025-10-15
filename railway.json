@@ -1,0 +1,92 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKER",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend",
+    "healthcheckPath": "/health",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "services": [
+    {
+      "name": "backend",
+      "envVars": {
+        "PORT": {
+          "value": "8000",
+          "description": "HTTP port exposed by the FastAPI server"
+        },
+        "OPENAI_API_KEY": {
+          "description": "OpenAI API key used for LLM requests",
+          "required": true
+        },
+        "DATABASE_URL": {
+          "value": "sqlite:///./chatbot.db",
+          "description": "Database connection string (SQLite by default, override for PostgreSQL)"
+        },
+        "APP_NAME": {
+          "value": "Data Flywheel Chatbot API",
+          "description": "Display name for the FastAPI application"
+        },
+        "DEBUG": {
+          "value": "false",
+          "description": "Enable debug logs and verbose validation output when true"
+        },
+        "DEFAULT_MODEL": {
+          "value": "gpt-4o",
+          "description": "Default LLM model identifier"
+        },
+        "DEFAULT_TEMPERATURE": {
+          "value": "0.7",
+          "description": "Default sampling temperature passed to the LLM provider"
+        },
+        "MAX_TOKENS": {
+          "value": "",
+          "description": "Optional token cap for LLM responses (blank to use provider default)"
+        },
+        "CORS_ORIGINS": {
+          "value": "*",
+          "description": "Comma-separated list of allowed CORS origins"
+        },
+        "CORS_CREDENTIALS": {
+          "value": "true",
+          "description": "Allow sending credentials (cookies/headers) across origins"
+        },
+        "CORS_METHODS": {
+          "value": "*",
+          "description": "Allowed HTTP methods for CORS preflight"
+        },
+        "CORS_HEADERS": {
+          "value": "*",
+          "description": "Allowed HTTP headers for CORS requests"
+        },
+        "RATE_LIMIT_REQUESTS": {
+          "value": "100",
+          "description": "Maximum requests per rate limiting window"
+        },
+        "RATE_LIMIT_WINDOW": {
+          "value": "3600",
+          "description": "Rate limiting window size in seconds"
+        },
+        "LOG_LEVEL": {
+          "value": "INFO",
+          "description": "Global logging level"
+        },
+        "LOG_FORMAT": {
+          "value": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+          "description": "Python logging format string"
+        },
+        "DEMO_MODE": {
+          "value": "false",
+          "description": "Toggle seeding demo content at startup"
+        },
+        "APP_VERSION": {
+          "value": "v0.3-interview",
+          "description": "Application version string for metadata endpoints"
+        }
+      }
+    }
+  ]
+}

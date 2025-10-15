@@ -8,7 +8,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -120,6 +120,17 @@ if settings.database_url.startswith('sqlite'):
 
 # Static frontend mount (if present) - mounted last to avoid shadowing API endpoints
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Serve favicon for browsers; return empty response if asset missing."""
+    candidate = os.path.join(frontend_path, "favicon.ico")
+    if os.path.exists(candidate):
+        return FileResponse(candidate, media_type="image/x-icon")
+    return Response(status_code=204)
+
+
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
     logger.info(f"Frontend mounted from: {frontend_path}")

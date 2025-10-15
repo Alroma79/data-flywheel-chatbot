@@ -19,7 +19,19 @@
       "Bash(curl:*)",
       "Bash(python -m uvicorn:*)",
       "Bash(sqlite3:*)",
-      "Bash(python -m pytest --cov=app)"
+      "Bash(python -m pytest --cov=app)",
+      "Bash(git pull:*)",
+      "Bash(pdftotext:*)",
+      "Bash(gh issue create:*)",
+      "WebSearch",
+      "Bash(python -m pytest tests/test_streaming.py -v)",
+      "Bash(pip install:*)",
+      "Bash(cd:*)",
+      "Bash(python test_streaming_client.py:*)",
+      "Bash(python -m pytest tests/test_streaming.py::TestStreamingIntegration::test_streaming_token_generation -v)",
+      "Bash(python -m pytest tests/test_streaming.py -v -k \"not error_handling\")",
+      "Bash(echo $OPENAI_API_KEY)",
+      "Bash(python -c \"import os; print(''DEMO_MODE:'', os.getenv(''DEMO_MODE'')); print(''FORCE_FALLBACK:'', os.getenv(''FORCE_FALLBACK'')); print(''Has OpenAI Key:'', bool(os.getenv(''OPENAI_API_KEY'')))\")"
     ],
     "deny": [],
     "ask": []
