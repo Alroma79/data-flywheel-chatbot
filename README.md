@@ -4,53 +4,31 @@
 
 A dynamic, configurable chatbot API built with FastAPI that supports multiple AI models, database persistence, and real-time configuration updates.
 
-## ⚡ 5-Minute Quickstart
+## 🚀 Live Demo
+The chatbot is deployed on **Railway**:  
+[https://flywheel-bot-production.up.railway.app](https://flywheel-bot-production.up.railway.app)
 
-### 🐳 Docker Quickstart (Recommended)
+- **Streaming** responses in real time via Server-Sent Events.  
+- Backed by **PostgreSQL** for persistent configs and feedback.  
+- Includes a `/current_time` endpoint returning current UTC timestamp.  
+- Built with **FastAPI**, **LangChain**, and **OpenAI GPT-4o** integration.
 
-**Get the full chatbot running with Docker in 2 commands:**
+## 🧰 Quick Start (Local)
+```bash
+# Clone and install
+git clone https://github.com/Alroma79/data-flywheel-chatbot.git
+cd data-flywheel-chatbot
+pip install -r backend/app/requirements.txt
 
-1. **Build and start:**
-   ```bash
-   docker compose up --build
-   ```
+# Set env vars
+cp .env.example .env
+# edit OPENAI_API_KEY and DATABASE_URL (Postgres or SQLite)
 
-2. **Open your browser:**
-   ```
-   http://localhost:8000/
-   ```
+# Run locally
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
 
-3. **Run tests:**
-   ```bash
-   docker compose run --rm test
-   ```
-
-📖 **For detailed Docker guide:** [docs/04_docker_guide.md](docs/04_docker_guide.md)
-
-### 🔧 Local Development Quickstart
-
-**Alternative: Run locally without Docker:**
-
-1. **Start the server:**
-   ```bash
-   cd backend && uvicorn app.main:app --reload
-   ```
-
-2. **Open your browser:**
-   ```
-   http://localhost:8000/
-   ```
-
-3. **Try the complete workflow:**
-   - Upload a knowledge file (TXT/PDF)
-   - Ask questions about the uploaded content
-   - See AI responses with source attribution
-   - Provide feedback with 👍/👎 buttons
-   - Load conversation history
-
-📖 **For detailed frontend documentation:** [docs/02_minimal_frontend.md](docs/02_minimal_frontend.md)
-
-### 🎬 Demo & Resources
+## 🎬 Demo & Resources
 
 - **📹 Demo GIF:** [90-second workflow demo](docs/demo.gif) *(Upload → Chat → Feedback → History)*
 - **🔗 API Collection:** [Postman Collection](docs/Flywheel.postman_collection.json) - Import for instant API testing
