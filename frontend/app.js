@@ -167,7 +167,12 @@ function createMessageElement(content, type, timestamp = null, sources = null, m
                     
                     // Submit feedback when comment is entered or after a delay
                     const submitFeedback = () => {
-                        submitMessageFeedback(content, feedback, commentInput.value);
+                        const messageText = (contentDiv.textContent || '').trim();
+                        if (!messageText) {
+                            showStatus('Message not ready for feedback yet', 'error');
+                            return;
+                        }
+                        submitMessageFeedback(messageText, feedback, commentInput.value);
                         commentInput.removeEventListener('blur', submitFeedback);
                         commentInput.removeEventListener('keypress', handleEnter);
                     };
@@ -395,10 +400,16 @@ async function loadChatHistory() {
 
 async function submitMessageFeedback(message, feedback, comment = '') {
     try {
+        const sanitizedMessage = (message || '').trim();
+        if (!sanitizedMessage) {
+            showStatus('Cannot submit feedback for an empty message', 'error');
+            return;
+        }
+
         await api.post('/feedback', {
-            message: message,
+            message: sanitizedMessage,
             user_feedback: feedback,
-            comment: comment || null
+            comment: (comment || '').trim() || null
         });
 
         showStatus('Feedback submitted successfully', 'success');

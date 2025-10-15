@@ -3,30 +3,27 @@ Configuration management for the Data Flywheel Chatbot application.
 Loads & validates environment variables.
 """
 
-from functools import lru_cache
+import json
 from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import uuid
 
 
 class Settings(BaseSettings):
     # --- Meta
     app_name: str = "Data Flywheel Chatbot API"
     debug: bool = Field(default=False, alias="DEBUG")
-    
+
     # --- Demo Mode
     demo_mode: bool = Field(default=False, alias="DEMO_MODE")
-    app_version: str = Field(default="v0.3-interview", alias="APP_VERSION")
+    app_version: str = Field(default="v0.3-railway", alias="APP_VERSION")
 
     # --- Database
-    # note: prefer absolute path for sqlite in prod; keep as-is for dev
-    database_url: str = Field(default="sqlite:///./backend/chatbot.db", alias="DATABASE_URL")
-
-    @classmethod
-    def _override_database_url(cls, url):
-        cls.database_url = url
+    database_url: str = Field(
+        default="postgresql+psycopg2://postgres:postgres@localhost:5432/chatbot",
+        alias="DATABASE_URL",
+    )
 
     # --- OpenAI
     openai_api_key: str = Field(alias="OPENAI_API_KEY")
@@ -36,15 +33,26 @@ class Settings(BaseSettings):
 
     # --- CORS
     cors_origins: List[str] = Field(
-        default_factory=lambda: ["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000","http://127.0.0.1:8000","http://localhost:8001","http://127.0.0.1:8001"],
-        alias="CORS_ORIGINS"
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:8001",
+            "http://127.0.0.1:8001",
+        ],
+        alias="CORS_ORIGINS",
     )
     cors_credentials: bool = Field(default=True, alias="CORS_CREDENTIALS")
     cors_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_METHODS")
     cors_headers: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_HEADERS")
 
     # --- Chat Settings
-    max_context_messages: int = Field(default=10, alias="MAX_CONTEXT_MESSAGES", description="Maximum number of messages to include in context window")
+    max_context_messages: int = Field(
+        default=10,
+        alias="MAX_CONTEXT_MESSAGES",
+        description="Maximum number of messages to include in context window",
+    )
 
     # --- Security
     app_token: Optional[str] = Field(default=None, alias="APP_TOKEN")
@@ -71,32 +79,45 @@ class Settings(BaseSettings):
     # ----- Validators (v2 style) -----
     @field_validator("cors_origins", "cors_methods", "cors_headers", mode="before")
     @classmethod
-    def _parse_csv_to_list(cls, v):
-        # Accept comma-separated string or list
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",") if item.strip()]
-        return v
+    def _parse_sequence(cls, value):
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            if raw.startswith("["):
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        return [
+                            item.strip()
+                            for item in parsed
+                            if isinstance(item, str) and item.strip()
+                        ]
+                except json.JSONDecodeError:
+                    pass
+            return [item.strip() for item in raw.split(",") if item.strip()]
+        return value
 
     @field_validator("database_url")
     @classmethod
-    def _require_db_url(cls, v: str) -> str:
-        if not v:
+    def _require_db_url(cls, value: str) -> str:
+        if not value:
             raise ValueError("DATABASE_URL is required")
-        return v
+        return value
 
     @field_validator("openai_api_key")
     @classmethod
-    def _require_openai_key(cls, v: str) -> str:
-        if not v:
+    def _require_openai_key(cls, value: str) -> str:
+        if not value:
             raise ValueError("OPENAI_API_KEY is required")
-        return v
+        return value
 
     @field_validator("default_temperature")
     @classmethod
-    def _check_temperature(cls, v: float) -> float:
-        if not (0 <= v <= 2):
+    def _check_temperature(cls, value: float) -> float:
+        if not (0 <= value <= 2):
             raise ValueError("DEFAULT_TEMPERATURE must be between 0 and 2")
-        return v
+        return value
 
 
 def get_settings() -> Settings:

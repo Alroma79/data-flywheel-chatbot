@@ -6,6 +6,7 @@ feedback collection, configuration management, and chat history.
 """
 
 from typing import List, Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -198,6 +199,57 @@ async def chat_with_bot(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Message cannot be empty"
             )
+
+        lower_message = sanitized_message.lower()
+        time_triggers = (
+            "what time is it",
+            "current time",
+            "time is it",
+            "time now",
+            "tell me the time",
+        )
+        if any(trigger in lower_message for trigger in time_triggers):
+            session_id = request.session_id or str(uuid.uuid4())
+            user_chat = ChatHistory(
+                session_id=session_id,
+                role="user",
+                content=sanitized_message,
+                user_id=request.user_id,
+            )
+            db.add(user_chat)
+            db.commit()
+            db.refresh(user_chat)
+
+            current_time_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            reply_text = f"The current UTC time is {current_time_iso}."
+
+            assistant_chat = ChatHistory(
+                session_id=user_chat.session_id,
+                role="assistant",
+                content=reply_text,
+            )
+            db.add(assistant_chat)
+            db.commit()
+
+            logger.info(f"Handled time request with direct response: {current_time_iso}")
+
+            if stream:
+                async def stream_time():
+                    payload = {"reply": reply_text, "session_id": user_chat.session_id}
+                    yield f"data: {json.dumps(payload)}\n\n"
+
+                headers = {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                }
+                return StreamingResponse(
+                    stream_time(),
+                    media_type="text/event-stream",
+                    headers=headers,
+                )
+
+            return {"reply": reply_text, "session_id": user_chat.session_id}
 
         # Search knowledge base for relevant information
         knowledge_processor = KnowledgeProcessor()

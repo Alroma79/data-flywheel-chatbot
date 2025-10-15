@@ -2,26 +2,66 @@
 """
 Demo seeding utilities.
 
-This is intentionally minimal for CI:
-- No DB writes by default.
-- Safe to import even if DB isn't configured.
+Provides optional bootstrap data (chatbot configuration, etc.) when
+`DEMO_MODE` is enabled. Keeps CI environments clean and idempotent.
 """
 
 import os
 from typing import Any
+from sqlalchemy.exc import SQLAlchemyError
 
-async def seed_demo(app: Any) -> None:
+from .config import get_settings
+from .db import SessionLocal
+from .models import ChatbotConfig
+from .utils import setup_logging
+
+settings = get_settings()
+logger = setup_logging()
+
+
+def _default_config_payload() -> dict:
+    """Return a baseline chatbot configuration."""
+    return {
+        "system_prompt": "You are a helpful assistant for the Data Flywheel Chatbot.",
+        "model": settings.default_model,
+        "temperature": settings.default_temperature,
+        "max_tokens": settings.max_tokens,
+    }
+
+
+async def seed_demo(app: Any) -> bool:
     """
-    Hook to pre-populate demo configs or seed data.
-    Called by app startup when DEMO_MODE=1 (or ENV=demo) in your code.
-    It's a no-op by default so CI doesn't need a DB.
+    Optionally seed default configuration data.
+
+    Returns:
+        True if new demo data was inserted, False otherwise.
     """
-    # Example (disabled): create default config rows using app.state.db
-    # db = getattr(app.state, "db", None)
-    # if db:
-    #     await db.create_default_config(...)
     if os.getenv("CI") == "true":
-        # Keep CI logs tidy
-        return
-    # You can log that seeding is skipped in non-local runs if you like.
-    return
+        return False
+
+    if not settings.demo_mode:
+        return False
+
+    session = SessionLocal()
+    try:
+        existing = session.query(ChatbotConfig).count()
+        if existing > 0:
+            logger.info("Demo seed skipped: chatbot configuration already present.")
+            return False
+
+        config = ChatbotConfig(
+            name="default",
+            config_json=_default_config_payload(),
+            is_active=True,
+            tags=["demo", "default"],
+        )
+        session.add(config)
+        session.commit()
+        logger.info("Demo seed inserted default chatbot configuration.")
+        return True
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.error(f"Demo seed failed: {exc}")
+        raise
+    finally:
+        session.close()

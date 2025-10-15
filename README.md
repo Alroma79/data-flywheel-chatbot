@@ -60,7 +60,8 @@ A dynamic, configurable chatbot API built with FastAPI that supports multiple AI
 ## 🚀 Features
 
 - **Dynamic AI Model Configuration**: Switch between different OpenAI models and adjust parameters on-the-fly
-- **Database Persistence**: Store chat history, user feedback, and configurations in PostgreSQL or SQLite
+- **PostgreSQL Persistence**: Store chat history, user feedback, and configurations in a Railway-ready PostgreSQL instance (SQLite remains an optional local fallback)
+- **Time Utility Endpoint**: Quickly fetch the current UTC timestamp via the lightweight `/current_time` endpoint
 - **RESTful API**: Clean, well-documented API endpoints with automatic OpenAPI documentation
 - **Error Handling & Logging**: Comprehensive error handling with structured logging
 - **Input Validation**: Robust input sanitization and validation using Pydantic
@@ -115,7 +116,7 @@ data-flywheel-chatbot/
 ### Prerequisites
 
 - Python 3.8+
-- PostgreSQL (optional, SQLite is used by default)
+- PostgreSQL (Railway managed instance or local server)
 - OpenAI API Key
 
 ### Local Development Setup
@@ -151,14 +152,18 @@ data-flywheel-chatbot/
    # Required
    OPENAI_API_KEY=your_openai_api_key_here
    
-   # Optional (defaults provided)
-   DATABASE_URL=sqlite:///./chatbot.db
+# Optional (defaults provided)
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/chatbot
+# To experiment with SQLite locally (not recommended for production), use:
+# DATABASE_URL=sqlite:///./chatbot.db
    DEBUG=false
    CORS_ORIGINS=*
    DEFAULT_MODEL=gpt-4o
    DEFAULT_TEMPERATURE=0.7
    LOG_LEVEL=INFO
    ```
+
+   The backend expects a PostgreSQL database by default; point `DATABASE_URL` to your Railway connection string or a local Postgres instance before starting the server.
 
 5. **Initialize the database**
    ```bash
@@ -202,6 +207,9 @@ Once the application is running, visit:
 #### Health
 - `GET /` - API status and version
 - `GET /health` - Health check endpoint
+
+#### Utility
+- `GET /current_time` - Current UTC time in ISO 8601 format
 
 ### Example Usage
 

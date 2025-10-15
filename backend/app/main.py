@@ -6,12 +6,15 @@ Initializes the FastAPI application with middleware, error handling, and routes.
 
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy.engine.url import make_url
 
 from .config import get_settings
 from .utils import setup_logging, format_error_response
@@ -19,13 +22,16 @@ from .routes import router
 from .routes_configs import router as configs_router
 from .routes_knowledge import router as knowledge_router
 from .demo_seed import seed_demo
+from .init_db import init_database
 
 # Initialize settings and logging
 settings = get_settings()
 logger = setup_logging()
 
+
 def _mask(k: str | None) -> str:
     return (k[:6] + "..." + k[-4:]) if k and len(k) > 12 else "<none>"
+
 
 logger.info(f"OpenAI key fingerprint: {_mask(settings.openai_api_key)}")
 logger.info(f"CORS origins: {settings.cors_origins}")
@@ -38,11 +44,18 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Application startup.")
     try:
+        init_database()
+        logger.info("Database initialization completed.")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        raise
+
+    try:
         did_seed = await seed_demo(app)
         if did_seed:
             logger.info("Demo seed executed (DEMO_MODE=true).")
         else:
-            logger.info("Demo seed skipped (DEMO_MODE=false).")
+            logger.info("Demo seed skipped or already satisfied.")
     except Exception as e:
         logger.warning(f"Demo seed error: {e}")
 
@@ -102,18 +115,32 @@ def health():
 def version():
     return {"version": settings.app_version}
 
+
+@app.get("/current_time")
+def current_time():
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    logger.info(f"/current_time accessed, responding with {now}")
+    return {"current_time": now}
+
+
 # Routers
 app.include_router(router, prefix="/api/v1")
 app.include_router(configs_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 
 # Database path logging for debugging
-import os
-masked_db_url = settings.database_url.replace(settings.database_url.split('/')[-1], "***") if 'sqlite' in settings.database_url.lower() else settings.database_url[:20] + "***"
+try:
+    parsed_url = make_url(settings.database_url)
+    backend = parsed_url.get_backend_name()
+    host = parsed_url.host or ""
+    port = f":{parsed_url.port}" if parsed_url.port else ""
+    database = parsed_url.database or ""
+    masked_db_url = f"{backend}://***@{host}{port}/{database}"
+except Exception:  # pragma: no cover - defensive logging
+    masked_db_url = settings.database_url
 logger.info(f"Database URL (masked): {masked_db_url}")
-if settings.database_url.startswith('sqlite'):
-    # Extract and resolve SQLite file path
-    sqlite_path = settings.database_url.replace('sqlite:///', '')
+if settings.database_url.startswith("sqlite"):
+    sqlite_path = settings.database_url.replace("sqlite:///", "")
     absolute_path = os.path.abspath(sqlite_path)
     logger.info(f"SQLite file path: {absolute_path}")
     logger.info(f"SQLite file exists: {os.path.exists(absolute_path)}")
