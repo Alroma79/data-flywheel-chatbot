@@ -5,7 +5,25 @@
 
 // API helper functions - UPDATED FOR BACKEND
 const api = {
-    baseUrl: 'http://localhost:8000/api/v1',
+    baseUrl: (() => {
+        const configured = window.API_BASE_URL;
+        if (configured && typeof configured === 'string') {
+            return `${configured.replace(/\/$/, '')}/api/v1`;
+        }
+
+        const { protocol, hostname, port } = window.location;
+        if (protocol === 'file:') {
+            return 'http://localhost:8000/api/v1';
+        }
+
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+
+        if (isLocal) {
+            return `${protocol}//${hostname}:8000/api/v1`;
+        }
+
+        return `${protocol}//${hostname}${port ? `:${port}` : ''}/api/v1`;
+    })(),
     
     async post(path, body) {
         console.log('API POST to:', `${this.baseUrl}${path}`);
