@@ -902,12 +902,17 @@ async function createConfiguration(event) {
     const name = elements.configurationName.value.trim();
     const model = elements.configurationModel.value.trim();
     const systemPrompt = elements.configurationPrompt.value.trim();
-    const temperature = Number(elements.configurationTemperature.value);
+    const temperatureInput = elements.configurationTemperature.value.trim();
+    const temperature = Number(temperatureInput);
     if (!name || !model || !systemPrompt) {
         showAnalyticsStatus(
             'Configuration name, model, and system prompt are required.',
             'error'
         );
+        return;
+    }
+    if (!temperatureInput) {
+        showAnalyticsStatus('Temperature is required.', 'error');
         return;
     }
     if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
