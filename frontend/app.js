@@ -911,12 +911,11 @@ async function createConfiguration(event) {
         );
         return;
     }
-    if (
-        !temperatureInput ||
-        Number.isNaN(temperature) ||
-        temperature < 0 ||
-        temperature > 2
-    ) {
+    if (!temperatureInput) {
+        showAnalyticsStatus('Temperature is required.', 'error');
+        return;
+    }
+    if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
         showAnalyticsStatus('Temperature must be between 0 and 2.', 'error');
         return;
     }
