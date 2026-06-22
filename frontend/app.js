@@ -114,7 +114,9 @@ function formatTimestamp(timestamp) {
 function createMessageElement(content, type, timestamp = null, sources = null, messageId = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
-    messageDiv.dataset.messageId = messageId;
+    if (messageId !== null && messageId !== undefined) {
+        messageDiv.dataset.messageId = String(messageId);
+    }
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
@@ -172,7 +174,12 @@ function createMessageElement(content, type, timestamp = null, sources = null, m
                             showStatus('Message not ready for feedback yet', 'error');
                             return;
                         }
-                        submitMessageFeedback(messageText, feedback, commentInput.value);
+                        submitMessageFeedback(
+                            messageText,
+                            feedback,
+                            commentInput.value,
+                            messageDiv.dataset.messageId
+                        );
                         commentInput.removeEventListener('blur', submitFeedback);
                         commentInput.removeEventListener('keypress', handleEnter);
                     };
@@ -241,7 +248,8 @@ async function sendMessage(useStreaming = true) {
                 response.reply,
                 'assistant',
                 new Date().toISOString(),
-                response.knowledge_sources
+                response.knowledge_sources,
+                response.assistant_message_id
             );
 
         } catch (error) {
@@ -320,6 +328,11 @@ async function sendMessage(useStreaming = true) {
                             highlightSession(currentSessionId);
                         }
 
+                        if (data.assistant_message_id) {
+                            assistantMessageElement.dataset.messageId =
+                                String(data.assistant_message_id);
+                        }
+
                         // Handle potential error response
                         if (data.error) {
                             throw new Error(data.error);
@@ -385,8 +398,13 @@ async function loadChatHistory() {
         
         // Add history messages in chronological order
         history.reverse().forEach(entry => {
-            addMessage(entry.user_message, 'user', entry.timestamp, null, entry.id);
-            addMessage(entry.bot_reply, 'assistant', entry.timestamp, null, entry.id);
+            addMessage(
+                entry.content,
+                entry.role,
+                entry.created_at,
+                null,
+                entry.id
+            );
         });
         
         showStatus(`Loaded ${history.length} recent conversations`, 'success');
@@ -398,7 +416,7 @@ async function loadChatHistory() {
     }
 }
 
-async function submitMessageFeedback(message, feedback, comment = '') {
+async function submitMessageFeedback(message, feedback, comment = '', responseId = null) {
     try {
         const sanitizedMessage = (message || '').trim();
         if (!sanitizedMessage) {
@@ -406,11 +424,17 @@ async function submitMessageFeedback(message, feedback, comment = '') {
             return;
         }
 
-        await api.post('/feedback', {
+        const payload = {
             message: sanitizedMessage,
             user_feedback: feedback,
             comment: (comment || '').trim() || null
-        });
+        };
+        const parsedResponseId = Number(responseId);
+        if (Number.isInteger(parsedResponseId) && parsedResponseId > 0) {
+            payload.response_id = parsedResponseId;
+        }
+
+        await api.post('/feedback', payload);
 
         showStatus('Feedback submitted successfully', 'success');
     } catch (error) {

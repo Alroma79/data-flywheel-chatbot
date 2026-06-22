@@ -100,6 +100,11 @@ class FeedbackCreate(BaseModel):
         max_length=1000,
         description="Optional additional comment"
     )
+    response_id: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Assistant chat-history message being rated",
+    )
 
 
 class ChatbotConfigBase(BaseModel):

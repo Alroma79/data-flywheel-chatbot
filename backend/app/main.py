@@ -21,6 +21,7 @@ from .utils import setup_logging, format_error_response
 from .routes import router
 from .routes_configs import router as configs_router
 from .routes_knowledge import router as knowledge_router
+from .routes_analytics import router as analytics_router
 from .demo_seed import seed_demo
 from .init_db import init_database
 
@@ -127,6 +128,7 @@ def current_time():
 app.include_router(router, prefix="/api/v1")
 app.include_router(configs_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
 
 # Database path logging for debugging
 try:

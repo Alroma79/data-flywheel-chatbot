@@ -39,6 +39,8 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 - **Dynamic AI Model Configuration**: Switch between different OpenAI models and adjust parameters on-the-fly
 - **PostgreSQL Persistence**: Store chat history, user feedback, and configurations in a Railway-ready PostgreSQL instance (SQLite remains an optional local fallback)
+- **Feedback Attribution**: Link each rating to the exact assistant response, model, and chatbot configuration that produced it
+- **Flywheel Analytics**: Compare approval rate, feedback coverage, response volume, and latency by configuration
 - **Time Utility Endpoint**: Quickly fetch the current UTC timestamp via the lightweight `/current_time` endpoint
 - **RESTful API**: Clean, well-documented API endpoints with automatic OpenAPI documentation
 - **Error Handling & Logging**: Comprehensive error handling with structured logging
@@ -181,6 +183,17 @@ Once the application is running, visit:
 #### Feedback
 - `POST /api/v1/feedback` - Submit user feedback
 - `GET /api/v1/feedback` - Retrieve feedback entries
+
+Feedback requests can include `response_id`, the `assistant_message_id` returned
+by the chat endpoint. The backend derives the associated configuration
+automatically.
+
+#### Flywheel Analytics
+- `GET /api/v1/analytics/configurations` - Configuration-level response and feedback metrics
+- `GET /api/v1/analytics/negative-feedback` - Recent negative examples with prompt, response, model, and configuration
+
+Analytics endpoints require `Authorization: Bearer <APP_TOKEN>` when
+`APP_TOKEN` is configured.
 
 #### Health
 - `GET /` - API status and version
