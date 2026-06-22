@@ -158,6 +158,47 @@ class Experiment(Base):
         return f"<Experiment(id={self.id}, name={self.name}, status={self.status})>"
 
 
+class FeedbackRecommendation(Base):
+    """Human-reviewed prompt improvement derived from negative feedback."""
+
+    __tablename__ = "feedback_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    theme_key = Column(String(50), nullable=False, index=True)
+    title = Column(String(150), nullable=False)
+    summary = Column(Text, nullable=False)
+    status = Column(
+        String(20),
+        nullable=False,
+        default="pending",
+        index=True,
+        comment="pending, approved, or dismissed",
+    )
+    source_config_id = Column(
+        Integer,
+        ForeignKey("chatbot_config.id"),
+        nullable=True,
+        index=True,
+    )
+    source_feedback_ids = Column(JSON, nullable=False)
+    evidence_examples = Column(JSON, nullable=False)
+    proposed_config_json = Column(JSON, nullable=False)
+    resulting_config_id = Column(
+        Integer,
+        ForeignKey("chatbot_config.id"),
+        nullable=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<FeedbackRecommendation(id={self.id}, "
+            f"theme={self.theme_key}, status={self.status})>"
+        )
+
+
 class KnowledgeFile(Base):
     """
     Model for storing knowledge file metadata.

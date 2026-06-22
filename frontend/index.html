@@ -513,6 +513,70 @@
             color: #166534;
         }
 
+        .recommendation-list {
+            display: grid;
+            gap: 14px;
+            padding: 16px;
+        }
+
+        .recommendation-card {
+            padding: 16px;
+            border: 1px solid #dbe4ef;
+            border-left: 4px solid #7c3aed;
+            border-radius: 8px;
+            background: #fdfcff;
+        }
+
+        .recommendation-card.approved {
+            border-left-color: #198754;
+            background: #fbfffc;
+        }
+
+        .recommendation-card.dismissed {
+            border-left-color: #94a3b8;
+            background: #f8fafc;
+        }
+
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .recommendation-summary {
+            margin-top: 7px;
+            color: #475569;
+        }
+
+        .recommendation-instruction {
+            margin-top: 12px;
+            padding: 11px 12px;
+            border-radius: 6px;
+            background: #f3e8ff;
+            white-space: pre-wrap;
+        }
+
+        .recommendation-evidence {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .evidence-item {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 13px;
+        }
+
+        .recommendation-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 13px;
+        }
+
         .btn-small {
             padding: 6px 9px;
             font-size: 12px;
@@ -808,6 +872,19 @@
                 </form>
                 <div class="experiment-list" id="experimentList">
                     <div class="dashboard-empty">No experiments loaded.</div>
+                </div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Feedback improvement recommendations</h2>
+                        <p>Cluster recurring negative feedback and review prompt changes before creating an inactive configuration draft.</p>
+                    </div>
+                    <button class="btn" id="generateRecommendationsBtn">Analyze feedback</button>
+                </div>
+                <div class="recommendation-list" id="recommendationList">
+                    <div class="dashboard-empty">No recommendations loaded.</div>
                 </div>
             </section>
 

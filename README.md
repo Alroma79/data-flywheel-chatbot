@@ -44,6 +44,8 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 - **Internal Dashboard**: Review configuration metrics and negative feedback examples directly in the web interface
 - **A/B Configuration Routing**: Run weighted experiments across prompt/model configurations with deterministic, session-sticky assignment
 - **Experiment Operations**: Create configurations, launch or pause experiments, and compare target allocation with observed quality metrics from the dashboard
+- **Feedback Clustering**: Group recurring negative feedback into explainable failure themes such as verbosity, accuracy, clarity, and relevance
+- **Human-Approved Improvements**: Review evidence-backed prompt recommendations and create inactive configuration drafts without changing live traffic
 - **Time Utility Endpoint**: Quickly fetch the current UTC timestamp via the lightweight `/current_time` endpoint
 - **RESTful API**: Clean, well-documented API endpoints with automatic OpenAPI documentation
 - **Error Handling & Logging**: Comprehensive error handling with structured logging
@@ -199,6 +201,10 @@ automatically.
 - `POST /api/v1/experiments` - Create a weighted experiment draft
 - `POST /api/v1/experiments/{id}/activate` - Route new sessions through an experiment
 - `POST /api/v1/experiments/{id}/pause` - Stop assigning new sessions while preserving attribution
+- `GET /api/v1/recommendations` - List feedback-derived prompt recommendations and their review status
+- `POST /api/v1/recommendations/generate` - Cluster recurring negative feedback and upsert pending recommendations
+- `POST /api/v1/recommendations/{id}/approve` - Create an inactive configuration draft after human approval
+- `POST /api/v1/recommendations/{id}/dismiss` - Dismiss a recommendation while preserving its evidence
 
 Analytics endpoints require `Authorization: Bearer <APP_TOKEN>` when
 `APP_TOKEN` is configured.
