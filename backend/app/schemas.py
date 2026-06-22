@@ -167,6 +167,40 @@ class ExperimentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RecommendationStatus(str, Enum):
+    """Lifecycle state for a feedback-derived recommendation."""
+
+    pending = "pending"
+    approved = "approved"
+    dismissed = "dismissed"
+
+
+class RecommendationApproval(BaseModel):
+    """Optional configuration name supplied during human approval."""
+
+    configuration_name: Optional[str] = Field(None, min_length=1, max_length=100)
+
+
+class FeedbackRecommendationOut(BaseModel):
+    """Persisted recommendation with evidence and proposed configuration."""
+
+    id: int
+    theme_key: str
+    title: str
+    summary: str
+    status: RecommendationStatus
+    source_config_id: Optional[int]
+    source_feedback_ids: List[int]
+    evidence_examples: List[Dict[str, Any]]
+    proposed_config_json: Dict[str, Any]
+    resulting_config_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
 class ChatbotConfigBase(BaseModel):
     """
     Base schema for chatbot configuration.

@@ -10,7 +10,14 @@ from pathlib import Path
 from sqlalchemy.engine.url import make_url
 
 from .db import Base, engine
-from .models import Feedback, ChatHistory, ChatbotConfig, Experiment, KnowledgeFile  # noqa: F401
+from .models import (  # noqa: F401
+    ChatHistory,
+    ChatbotConfig,
+    Experiment,
+    Feedback,
+    FeedbackRecommendation,
+    KnowledgeFile,
+)
 from .utils import setup_logging
 
 # Initialize logging

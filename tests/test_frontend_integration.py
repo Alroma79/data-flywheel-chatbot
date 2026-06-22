@@ -47,6 +47,8 @@ class TestFrontendIntegration:
         assert 'id="configurationForm"' in response.text
         assert 'id="experimentForm"' in response.text
         assert 'id="experimentList"' in response.text
+        assert 'id="generateRecommendationsBtn"' in response.text
+        assert 'id="recommendationList"' in response.text
 
         script_response = test_client.get("/app.js")
         assert script_response.status_code == 200
@@ -55,6 +57,8 @@ class TestFrontendIntegration:
         assert "createExperiment" in script_response.text
         assert "handleExperimentAction" in script_response.text
         assert "Number.isNaN(temperature)" in script_response.text
+        assert "generateRecommendations" in script_response.text
+        assert "handleRecommendationAction" in script_response.text
 
     # API Accessibility Tests
 

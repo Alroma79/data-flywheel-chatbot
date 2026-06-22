@@ -118,7 +118,9 @@ const elements = {
     variantBConfig: document.getElementById('variantBConfig'),
     variantBWeight: document.getElementById('variantBWeight'),
     createExperimentBtn: document.getElementById('createExperimentBtn'),
-    experimentList: document.getElementById('experimentList')
+    experimentList: document.getElementById('experimentList'),
+    generateRecommendationsBtn: document.getElementById('generateRecommendationsBtn'),
+    recommendationList: document.getElementById('recommendationList')
 };
 
 // Application state
@@ -127,6 +129,7 @@ let currentSessionId = null;
 let activeConfigs = [];
 let experimentDefinitions = [];
 let experimentMetrics = [];
+let feedbackRecommendations = [];
 
 // Utility functions
 function showStatus(message, type = 'success') {
@@ -897,6 +900,95 @@ function renderExperiments() {
     }).join('');
 }
 
+function recommendationInstruction(configJson) {
+    const prompt = String(configJson?.system_prompt || '');
+    const marker = 'Improvement instruction:';
+    const markerIndex = prompt.lastIndexOf(marker);
+    return markerIndex >= 0
+        ? prompt.slice(markerIndex + marker.length).trim()
+        : prompt;
+}
+
+function renderRecommendations() {
+    if (!feedbackRecommendations.length) {
+        elements.recommendationList.innerHTML =
+            '<div class="dashboard-empty">No recurring negative-feedback themes yet. At least two matching negative ratings are required.</div>';
+        return;
+    }
+
+    elements.recommendationList.innerHTML = feedbackRecommendations.map(item => {
+        const examples = item.evidence_examples.map(example => `
+            <div class="evidence-item">
+                <strong>User comment:</strong> ${escapeHtml(example.comment || 'No comment')}<br>
+                <strong>Prompt:</strong> ${escapeHtml(example.prompt || 'Unavailable')}
+            </div>
+        `).join('');
+        const actions = item.status === 'pending'
+            ? `
+                <div class="recommendation-actions">
+                    <button class="btn btn-small" data-recommendation-action="approve" data-recommendation-id="${item.id}">Approve draft</button>
+                    <button class="btn btn-small" data-recommendation-action="dismiss" data-recommendation-id="${item.id}">Dismiss</button>
+                </div>
+            `
+            : item.resulting_config_id
+                ? `<div class="recommendation-actions">Inactive configuration draft #${item.resulting_config_id} created.</div>`
+                : '';
+        return `
+            <article class="recommendation-card ${escapeHtml(item.status)}">
+                <div class="recommendation-header">
+                    <div>
+                        <strong>${escapeHtml(item.title)}</strong>
+                        <div class="recommendation-summary">${escapeHtml(item.summary)}</div>
+                    </div>
+                    <span class="experiment-badge ${item.status === 'approved' ? 'active' : ''}">${escapeHtml(item.status)}</span>
+                </div>
+                <div class="recommendation-instruction">
+                    <strong>Proposed instruction:</strong>
+                    ${escapeHtml(recommendationInstruction(item.proposed_config_json))}
+                </div>
+                <div class="recommendation-evidence">${examples}</div>
+                ${actions}
+            </article>
+        `;
+    }).join('');
+}
+
+async function generateRecommendations() {
+    elements.generateRecommendationsBtn.disabled = true;
+    showAnalyticsStatus('Analyzing recurring negative feedback...');
+    try {
+        await api.post('/recommendations/generate?min_count=2');
+        showAnalyticsStatus('Feedback analysis complete.');
+        await loadAnalytics();
+    } catch (error) {
+        showAnalyticsStatus(`Recommendation error: ${error.message}`, 'error');
+    } finally {
+        elements.generateRecommendationsBtn.disabled = false;
+    }
+}
+
+async function handleRecommendationAction(event) {
+    const button = event.target.closest('[data-recommendation-action]');
+    if (!button) {
+        return;
+    }
+    const recommendationId = button.dataset.recommendationId;
+    const action = button.dataset.recommendationAction;
+    button.disabled = true;
+    try {
+        await api.post(`/recommendations/${recommendationId}/${action}`);
+        showAnalyticsStatus(
+            action === 'approve'
+                ? 'Inactive configuration draft created for human review.'
+                : 'Recommendation dismissed.'
+        );
+        await loadAnalytics();
+    } catch (error) {
+        showAnalyticsStatus(`Recommendation error: ${error.message}`, 'error');
+        button.disabled = false;
+    }
+}
+
 async function createConfiguration(event) {
     event.preventDefault();
     const name = elements.configurationName.value.trim();
@@ -1010,20 +1102,30 @@ async function loadAnalytics() {
     showAnalyticsStatus('Loading analytics...');
 
     try {
-        const [configurations, negativeFeedback, experiments, experimentAnalytics, configs] = await Promise.all([
+        const [
+            configurations,
+            negativeFeedback,
+            experiments,
+            experimentAnalytics,
+            configs,
+            recommendations
+        ] = await Promise.all([
             api.get('/analytics/configurations'),
             api.get('/analytics/negative-feedback?limit=20'),
             api.get('/experiments'),
             api.get('/analytics/experiments'),
-            api.get('/configs?active_only=true&size=100')
+            api.get('/configs?active_only=true&size=100'),
+            api.get('/recommendations')
         ]);
 
         activeConfigs = configs.items;
         experimentDefinitions = experiments;
         experimentMetrics = experimentAnalytics;
+        feedbackRecommendations = recommendations;
         renderSummaryMetrics(configurations);
         renderExperimentConfigOptions(activeConfigs);
         renderExperiments();
+        renderRecommendations();
         renderConfigurationAnalytics(configurations);
         renderNegativeFeedback(negativeFeedback);
         showAnalyticsStatus(`Loaded ${configurations.length} configuration result(s).`);
@@ -1070,6 +1172,8 @@ elements.saveTokenBtn.addEventListener('click', saveAnalyticsToken);
 elements.configurationForm.addEventListener('submit', createConfiguration);
 elements.experimentForm.addEventListener('submit', createExperiment);
 elements.experimentList.addEventListener('click', handleExperimentAction);
+elements.generateRecommendationsBtn.addEventListener('click', generateRecommendations);
+elements.recommendationList.addEventListener('click', handleRecommendationAction);
 
 // Initialize
 console.log('Data Flywheel Chatbot initialized');
