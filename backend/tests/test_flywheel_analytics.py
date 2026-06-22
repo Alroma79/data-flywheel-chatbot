@@ -184,11 +184,12 @@ def test_attribution_migration_upgrades_existing_database(tmp_path):
     assert "feedback.response_id" in applied
     assert {
         "config_id",
+        "experiment_id",
         "model_name",
         "latency_ms",
     }.issubset(
         {column["name"] for column in inspect(engine).get_columns("chat_history")}
     )
-    assert {"response_id", "config_id"}.issubset(
+    assert {"response_id", "config_id", "experiment_id"}.issubset(
         {column["name"] for column in inspect(engine).get_columns("feedback")}
     )

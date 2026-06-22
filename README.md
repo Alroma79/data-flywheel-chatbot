@@ -42,6 +42,8 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 - **Feedback Attribution**: Link each rating to the exact assistant response, model, and chatbot configuration that produced it
 - **Flywheel Analytics**: Compare approval rate, feedback coverage, response volume, and latency by configuration
 - **Internal Dashboard**: Review configuration metrics and negative feedback examples directly in the web interface
+- **A/B Configuration Routing**: Run weighted experiments across prompt/model configurations with deterministic, session-sticky assignment
+- **Experiment Operations**: Create configurations, launch or pause experiments, and compare target allocation with observed quality metrics from the dashboard
 - **Time Utility Endpoint**: Quickly fetch the current UTC timestamp via the lightweight `/current_time` endpoint
 - **RESTful API**: Clean, well-documented API endpoints with automatic OpenAPI documentation
 - **Error Handling & Logging**: Comprehensive error handling with structured logging
@@ -192,6 +194,11 @@ automatically.
 #### Flywheel Analytics
 - `GET /api/v1/analytics/configurations` - Configuration-level response and feedback metrics
 - `GET /api/v1/analytics/negative-feedback` - Recent negative examples with prompt, response, model, and configuration
+- `GET /api/v1/analytics/experiments` - Experiment allocation, approval, coverage, and latency by variant
+- `GET /api/v1/experiments` - List configuration experiments
+- `POST /api/v1/experiments` - Create a weighted experiment draft
+- `POST /api/v1/experiments/{id}/activate` - Route new sessions through an experiment
+- `POST /api/v1/experiments/{id}/pause` - Stop assigning new sessions while preserving attribution
 
 Analytics endpoints require `Authorization: Bearer <APP_TOKEN>` when
 `APP_TOKEN` is configured.
