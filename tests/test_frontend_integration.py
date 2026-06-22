@@ -55,6 +55,7 @@ class TestFrontendIntegration:
         assert "createExperiment" in script_response.text
         assert "handleExperimentAction" in script_response.text
         assert "Number.isNaN(temperature)" in script_response.text
+        assert "!temperatureInput" in script_response.text
 
     # API Accessibility Tests
 

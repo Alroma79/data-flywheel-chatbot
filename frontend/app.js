@@ -902,7 +902,8 @@ async function createConfiguration(event) {
     const name = elements.configurationName.value.trim();
     const model = elements.configurationModel.value.trim();
     const systemPrompt = elements.configurationPrompt.value.trim();
-    const temperature = Number(elements.configurationTemperature.value);
+    const temperatureInput = elements.configurationTemperature.value.trim();
+    const temperature = Number(temperatureInput);
     if (!name || !model || !systemPrompt) {
         showAnalyticsStatus(
             'Configuration name, model, and system prompt are required.',
@@ -910,7 +911,12 @@ async function createConfiguration(event) {
         );
         return;
     }
-    if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
+    if (
+        !temperatureInput ||
+        Number.isNaN(temperature) ||
+        temperature < 0 ||
+        temperature > 2
+    ) {
         showAnalyticsStatus('Temperature must be between 0 and 2.', 'error');
         return;
     }
