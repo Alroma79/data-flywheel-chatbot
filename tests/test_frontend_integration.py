@@ -35,6 +35,21 @@ class TestFrontendIntegration:
         data = response.json()
         assert "version" in data
 
+    def test_analytics_dashboard_shell(self, test_client):
+        """The frontend exposes the internal flywheel analytics view."""
+        response = test_client.get("/")
+
+        assert response.status_code == 200
+        assert 'id="analyticsView"' in response.text
+        assert 'id="configurationAnalytics"' in response.text
+        assert 'id="negativeFeedbackList"' in response.text
+        assert 'id="analyticsToken"' in response.text
+
+        script_response = test_client.get("/app.js")
+        assert script_response.status_code == 200
+        assert "window.location" in script_response.text
+        assert "return `${origin}/api/v1`" in script_response.text
+
     # API Accessibility Tests
 
     def test_api_endpoints_accessible(self, test_client):

@@ -41,6 +41,7 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 - **PostgreSQL Persistence**: Store chat history, user feedback, and configurations in a Railway-ready PostgreSQL instance (SQLite remains an optional local fallback)
 - **Feedback Attribution**: Link each rating to the exact assistant response, model, and chatbot configuration that produced it
 - **Flywheel Analytics**: Compare approval rate, feedback coverage, response volume, and latency by configuration
+- **Internal Dashboard**: Review configuration metrics and negative feedback examples directly in the web interface
 - **Time Utility Endpoint**: Quickly fetch the current UTC timestamp via the lightweight `/current_time` endpoint
 - **RESTful API**: Clean, well-documented API endpoints with automatic OpenAPI documentation
 - **Error Handling & Logging**: Comprehensive error handling with structured logging
@@ -194,6 +195,10 @@ automatically.
 
 Analytics endpoints require `Authorization: Bearer <APP_TOKEN>` when
 `APP_TOKEN` is configured.
+
+Open the application and select **Flywheel Analytics** in the sidebar to view
+the dashboard. If production analytics are protected, enter `APP_TOKEN`; it is
+kept in browser session storage and cleared when the browser session ends.
 
 #### Health
 - `GET /` - API status and version

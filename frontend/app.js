@@ -11,27 +11,35 @@ const api = {
             return `${configured.replace(/\/$/, '')}/api/v1`;
         }
 
-        const { protocol, hostname, port } = window.location;
+        const { protocol, origin } = window.location;
         if (protocol === 'file:') {
             return 'http://localhost:8000/api/v1';
         }
 
-        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-
-        if (isLocal) {
-            return `${protocol}//${hostname}:8000/api/v1`;
-        }
-
-        return `${protocol}//${hostname}${port ? `:${port}` : ''}/api/v1`;
+        return `${origin}/api/v1`;
     })(),
-    
+
+    getToken() {
+        return window.sessionStorage.getItem('flywheelAppToken') || '';
+    },
+
+    buildHeaders(includeJson = false) {
+        const headers = {};
+        if (includeJson) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const token = this.getToken();
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+        return headers;
+    },
+
     async post(path, body) {
         console.log('API POST to:', `${this.baseUrl}${path}`);
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: this.buildHeaders(true),
             body: JSON.stringify(body)
         });
         return this.handleResponse(response);
@@ -41,20 +49,24 @@ const api = {
         console.log('API POST FILE to:', `${this.baseUrl}${path}`);
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
+            headers: this.buildHeaders(),
             body: formData
         });
         return this.handleResponse(response);
     },
     
     async get(path) {
-        const response = await fetch(`${this.baseUrl}${path}`);
+        const response = await fetch(`${this.baseUrl}${path}`, {
+            headers: this.buildHeaders()
+        });
         return this.handleResponse(response);
     },
 
     async delete(path) {
         console.log('API DELETE to:', `${this.baseUrl}${path}`);
         const response = await fetch(`${this.baseUrl}${path}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: this.buildHeaders()
         });
         return this.handleResponse(response);
     },
@@ -78,7 +90,21 @@ const elements = {
     historyBtn: document.getElementById('historyBtn'),
     status: document.getElementById('status'),
     sessionsList: document.getElementById('sessionsList'),
-    newChatBtn: document.getElementById('newChatBtn')
+    newChatBtn: document.getElementById('newChatBtn'),
+    chatView: document.getElementById('chatView'),
+    analyticsView: document.getElementById('analyticsView'),
+    chatViewBtn: document.getElementById('chatViewBtn'),
+    analyticsViewBtn: document.getElementById('analyticsViewBtn'),
+    analyticsToken: document.getElementById('analyticsToken'),
+    saveTokenBtn: document.getElementById('saveTokenBtn'),
+    refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
+    analyticsStatus: document.getElementById('analyticsStatus'),
+    configurationAnalytics: document.getElementById('configurationAnalytics'),
+    negativeFeedbackList: document.getElementById('negativeFeedbackList'),
+    totalResponsesMetric: document.getElementById('totalResponsesMetric'),
+    ratedResponsesMetric: document.getElementById('ratedResponsesMetric'),
+    approvalRateMetric: document.getElementById('approvalRateMetric'),
+    feedbackCoverageMetric: document.getElementById('feedbackCoverageMetric')
 };
 
 // Application state
@@ -108,6 +134,22 @@ function scrollToBottom() {
 
 function formatTimestamp(timestamp) {
     return new Date(timestamp).toLocaleTimeString();
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function formatPercent(value) {
+    if (value === null || value === undefined) {
+        return '—';
+    }
+    return `${Math.round(value * 100)}%`;
 }
 
 // Message rendering functions
@@ -275,7 +317,7 @@ async function sendMessage(useStreaming = true) {
         const response = await fetch(`${api.baseUrl}/chat`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                ...api.buildHeaders(true)
             },
             body: JSON.stringify({
                 message,
@@ -552,7 +594,7 @@ async function switchToSession(sessionId) {
 
         // Add messages in chronological order
         sessionMessages.reverse().forEach(entry => {
-            addMessage(entry.content, entry.role, entry.created_at);
+            addMessage(entry.content, entry.role, entry.created_at, null, entry.id);
         });
 
         // Update current session
@@ -595,6 +637,8 @@ async function deleteSession(sessionId) {
 }
 
 function startNewChat() {
+    setActiveView('chat');
+
     // Clear current session
     currentSessionId = null;
 
@@ -621,6 +665,161 @@ function startNewChat() {
     showStatus('Started new chat', 'success');
 }
 
+// =============================
+// Flywheel Analytics
+// =============================
+
+function showAnalyticsStatus(message, type = 'success') {
+    elements.analyticsStatus.innerHTML =
+        `<div class="status ${type}">${escapeHtml(message)}</div>`;
+}
+
+function setActiveView(viewName) {
+    const showingAnalytics = viewName === 'analytics';
+    elements.chatView.classList.toggle('hidden', showingAnalytics);
+    elements.analyticsView.classList.toggle('hidden', !showingAnalytics);
+    elements.chatViewBtn.classList.toggle('active', !showingAnalytics);
+    elements.analyticsViewBtn.classList.toggle('active', showingAnalytics);
+
+    if (showingAnalytics) {
+        loadAnalytics();
+    } else {
+        elements.messageInput.focus();
+    }
+}
+
+function renderConfigurationAnalytics(configurations) {
+    if (!configurations.length) {
+        elements.configurationAnalytics.innerHTML =
+            '<div class="dashboard-empty">No attributed responses yet. Send a chat message and rate the response.</div>';
+        return;
+    }
+
+    const rows = configurations.map(config => {
+        const approvalWidth = config.approval_rate === null
+            ? 0
+            : Math.round(config.approval_rate * 100);
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(config.config_name)}</strong><br>
+                    <span>${escapeHtml(config.model || 'Unknown model')}</span>
+                </td>
+                <td>${config.total_responses}</td>
+                <td>${config.rated_responses}</td>
+                <td>
+                    ${formatPercent(config.approval_rate)}
+                    <div class="rate-bar" aria-hidden="true">
+                        <span style="width: ${approvalWidth}%"></span>
+                    </div>
+                </td>
+                <td>${formatPercent(config.feedback_coverage)}</td>
+                <td>${config.average_latency_ms === null ? '—' : `${config.average_latency_ms} ms`}</td>
+            </tr>
+        `;
+    }).join('');
+
+    elements.configurationAnalytics.innerHTML = `
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Configuration</th>
+                    <th>Responses</th>
+                    <th>Rated</th>
+                    <th>Approval</th>
+                    <th>Coverage</th>
+                    <th>Avg. latency</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function renderNegativeFeedback(examples) {
+    if (!examples.length) {
+        elements.negativeFeedbackList.innerHTML =
+            '<div class="dashboard-empty">No negative feedback has been attributed yet.</div>';
+        return;
+    }
+
+    elements.negativeFeedbackList.innerHTML = examples.map(example => `
+        <article class="negative-item">
+            <div class="negative-meta">
+                <span>Config: ${escapeHtml(example.config_name)}</span>
+                <span>Model: ${escapeHtml(example.model || 'Unknown')}</span>
+                <span>${escapeHtml(new Date(example.timestamp).toLocaleString())}</span>
+            </div>
+            <div class="negative-prompt">
+                <strong>Prompt:</strong> ${escapeHtml(example.prompt || 'Unavailable')}
+            </div>
+            <div class="negative-response">
+                <strong>Response:</strong> ${escapeHtml(example.response)}
+            </div>
+            <div class="negative-comment">
+                <strong>User comment:</strong> ${escapeHtml(example.comment || 'No comment supplied')}
+            </div>
+        </article>
+    `).join('');
+}
+
+function renderSummaryMetrics(configurations) {
+    const totals = configurations.reduce((summary, config) => {
+        summary.responses += config.total_responses;
+        summary.rated += config.rated_responses;
+        summary.positive += config.positive_feedback;
+        return summary;
+    }, { responses: 0, rated: 0, positive: 0 });
+
+    elements.totalResponsesMetric.textContent = String(totals.responses);
+    elements.ratedResponsesMetric.textContent = String(totals.rated);
+    elements.approvalRateMetric.textContent = totals.rated
+        ? formatPercent(totals.positive / totals.rated)
+        : '—';
+    elements.feedbackCoverageMetric.textContent = totals.responses
+        ? formatPercent(totals.rated / totals.responses)
+        : '0%';
+}
+
+async function loadAnalytics() {
+    elements.refreshAnalyticsBtn.disabled = true;
+    showAnalyticsStatus('Loading analytics...');
+
+    try {
+        const [configurations, negativeFeedback] = await Promise.all([
+            api.get('/analytics/configurations'),
+            api.get('/analytics/negative-feedback?limit=20')
+        ]);
+
+        renderSummaryMetrics(configurations);
+        renderConfigurationAnalytics(configurations);
+        renderNegativeFeedback(negativeFeedback);
+        showAnalyticsStatus(`Loaded ${configurations.length} configuration result(s).`);
+    } catch (error) {
+        const needsToken = /403|token|credentials/i.test(error.message);
+        showAnalyticsStatus(
+            needsToken
+                ? 'Analytics access requires the APP_TOKEN configured on the server.'
+                : `Analytics error: ${error.message}`,
+            'error'
+        );
+    } finally {
+        elements.refreshAnalyticsBtn.disabled = false;
+    }
+}
+
+function saveAnalyticsToken() {
+    const token = elements.analyticsToken.value.trim();
+    if (token) {
+        window.sessionStorage.setItem('flywheelAppToken', token);
+        showAnalyticsStatus('Token saved for this browser session.');
+    } else {
+        window.sessionStorage.removeItem('flywheelAppToken');
+        showAnalyticsStatus('Stored token cleared.');
+    }
+    loadAnalytics();
+}
+
 // Event listeners
 elements.sendBtn.addEventListener('click', sendMessage);
 elements.messageInput.addEventListener('keypress', (e) => {
@@ -632,8 +831,13 @@ elements.messageInput.addEventListener('keypress', (e) => {
 elements.uploadBtn.addEventListener('click', uploadFile);
 elements.historyBtn.addEventListener('click', loadChatHistory);
 elements.newChatBtn.addEventListener('click', startNewChat);
+elements.chatViewBtn.addEventListener('click', () => setActiveView('chat'));
+elements.analyticsViewBtn.addEventListener('click', () => setActiveView('analytics'));
+elements.refreshAnalyticsBtn.addEventListener('click', loadAnalytics);
+elements.saveTokenBtn.addEventListener('click', saveAnalyticsToken);
 
 // Initialize
 console.log('Data Flywheel Chatbot initialized');
+elements.analyticsToken.value = api.getToken();
 loadSessions(); // Load sessions on startup
 elements.messageInput.focus();
