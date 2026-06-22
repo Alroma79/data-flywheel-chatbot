@@ -910,7 +910,7 @@ async function createConfiguration(event) {
         );
         return;
     }
-    if (temperature < 0 || temperature > 2) {
+    if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
         showAnalyticsStatus('Temperature must be between 0 and 2.', 'error');
         return;
     }

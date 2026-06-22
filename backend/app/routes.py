@@ -230,8 +230,13 @@ async def chat_with_bot(
             )
 
         local_settings = get_settings()
+        is_new_session = request.session_id is None
         session_id = request.session_id or str(uuid.uuid4())
-        config, experiment = select_chat_configuration(db, session_id)
+        config, experiment = select_chat_configuration(
+            db,
+            session_id,
+            is_new_session=is_new_session,
+        )
 
         lower_message = sanitized_message.lower()
         time_triggers = (

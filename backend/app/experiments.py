@@ -45,17 +45,20 @@ def choose_weighted_variant(experiment: Experiment, session_id: str) -> int:
 def select_chat_configuration(
     db: Session,
     session_id: str,
+    is_new_session: bool = False,
 ) -> tuple[ChatbotConfig | None, Experiment | None]:
     """Return the sticky session variant or assign the active experiment."""
-    previous = (
-        db.query(ChatHistory)
-        .filter(
-            ChatHistory.session_id == session_id,
-            ChatHistory.config_id.is_not(None),
+    previous = None
+    if not is_new_session:
+        previous = (
+            db.query(ChatHistory)
+            .filter(
+                ChatHistory.session_id == session_id,
+                ChatHistory.config_id.is_not(None),
+            )
+            .order_by(ChatHistory.id.asc())
+            .first()
         )
-        .order_by(ChatHistory.id.asc())
-        .first()
-    )
     if previous:
         config = db.query(ChatbotConfig).filter(ChatbotConfig.id == previous.config_id).first()
         experiment = (

@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.exceptions import RequestValidationError
@@ -94,12 +95,16 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     logger.error(f"Validation error: {exc.errors()}")
+    validation_errors = jsonable_encoder(
+        exc.errors(),
+        custom_encoder={ValueError: str},
+    )
     return JSONResponse(
         status_code=422,
         content={
             "error": True,
             "message": "Request validation failed",
-            "details": exc.errors() if settings.debug else None,
+            "details": validation_errors if settings.debug else None,
         },
     )
 

@@ -222,7 +222,10 @@ class ChatbotConfigBase(BaseModel):
         for field in required_fields:
             if field not in v:
                 raise ValueError(f'Missing required field: {field}')
-        if not 0 <= v.get('temperature', 0.7) <= 2:
+        temperature = v.get('temperature')
+        if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+            raise ValueError('Temperature must be a number between 0 and 2')
+        if not 0 <= temperature <= 2:
             raise ValueError('Temperature must be between 0 and 2')
         if not str(v.get('system_prompt', '')).strip():
             raise ValueError('system_prompt cannot be empty')
@@ -263,8 +266,12 @@ class ChatbotConfigUpdate(BaseModel):
         """Validate configuration fields if provided."""
         if v is None:
             return v
-        if 'temperature' in v and not 0 <= v['temperature'] <= 2:
-            raise ValueError('Temperature must be between 0 and 2')
+        if 'temperature' in v:
+            temperature = v['temperature']
+            if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+                raise ValueError('Temperature must be a number between 0 and 2')
+            if not 0 <= temperature <= 2:
+                raise ValueError('Temperature must be between 0 and 2')
         if 'system_prompt' in v and not str(v['system_prompt']).strip():
             raise ValueError('system_prompt cannot be empty')
         if 'model' in v and not str(v['model']).strip():

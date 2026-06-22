@@ -1,5 +1,8 @@
 """Integration tests for weighted, sticky configuration experiments."""
 
+from sqlalchemy import event
+
+from app.db import engine
 from app.db import SessionLocal
 from app.experiments import choose_weighted_variant
 from app.models import ChatbotConfig, Experiment
@@ -174,3 +177,46 @@ def test_active_configuration_list_is_json_serializable(test_client):
     data = response.json()
     assert data["total"] >= 1
     assert data["items"][0]["created_at"]
+
+
+def test_new_session_skips_sticky_assignment_history_query(test_client, mock_llm):
+    sticky_assignment_queries = []
+
+    def capture_select(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().split())
+        if (
+            normalized.startswith("select")
+            and "from chat_history" in normalized
+            and "chat_history.session_id =" in normalized
+            and "chat_history.config_id is not null" in normalized
+        ):
+            sticky_assignment_queries.append(normalized)
+
+    event.listen(engine, "before_cursor_execute", capture_select)
+    try:
+        response = test_client.post(
+            "/api/v1/chat",
+            json={"message": "Start a new routed session"},
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_select)
+
+    assert response.status_code == 200
+    assert sticky_assignment_queries == []
+
+
+def test_config_creation_rejects_non_numeric_temperature(test_client):
+    response = test_client.post(
+        "/api/v1/configs",
+        json={
+            "name": "Invalid temperature",
+            "config_json": {
+                "system_prompt": "Be helpful.",
+                "model": "gpt-4o",
+                "temperature": None,
+            },
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 422

@@ -109,11 +109,15 @@ async def pause_experiment(
     db: Session = Depends(get_db),
     _: None = Depends(verify_bearer_token),
 ):
-    experiment = _experiment_or_404(db, experiment_id)
-    experiment.status = "paused"
-    db.commit()
-    db.refresh(experiment)
-    return experiment
+    try:
+        experiment = _experiment_or_404(db, experiment_id)
+        experiment.status = "paused"
+        db.commit()
+        db.refresh(experiment)
+        return experiment
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to pause experiment")
 
 
 @router.post("/{experiment_id}/complete", response_model=ExperimentOut)
@@ -122,8 +126,12 @@ async def complete_experiment(
     db: Session = Depends(get_db),
     _: None = Depends(verify_bearer_token),
 ):
-    experiment = _experiment_or_404(db, experiment_id)
-    experiment.status = "completed"
-    db.commit()
-    db.refresh(experiment)
-    return experiment
+    try:
+        experiment = _experiment_or_404(db, experiment_id)
+        experiment.status = "completed"
+        db.commit()
+        db.refresh(experiment)
+        return experiment
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to complete experiment")
