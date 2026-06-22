@@ -7,7 +7,6 @@ under the /api/v1/configs path.
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
@@ -94,7 +93,10 @@ async def list_configs(
         pages = ceil(total / size) if total > 0 else 1
 
         response_data = {
-            "items": [ChatbotConfigOut.from_orm(config).dict() for config in configs],
+            "items": [
+                ChatbotConfigOut.model_validate(config).model_dump(mode="json")
+                for config in configs
+            ],
             "total": total,
             "page": page,
             "size": size,
@@ -102,7 +104,7 @@ async def list_configs(
         }
 
         logger.info(f"Retrieved {len(configs)} configs (total: {total})")
-        return JSONResponse(content=response_data)
+        return response_data
 
     except SQLAlchemyError as e:
         logger.error(f"Database error while listing configs: {str(e)}")

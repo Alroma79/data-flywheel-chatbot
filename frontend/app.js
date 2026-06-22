@@ -40,7 +40,7 @@ const api = {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
             headers: this.buildHeaders(true),
-            body: JSON.stringify(body)
+            body: JSON.stringify(body ?? {})
         });
         return this.handleResponse(response);
     },
@@ -104,12 +104,29 @@ const elements = {
     totalResponsesMetric: document.getElementById('totalResponsesMetric'),
     ratedResponsesMetric: document.getElementById('ratedResponsesMetric'),
     approvalRateMetric: document.getElementById('approvalRateMetric'),
-    feedbackCoverageMetric: document.getElementById('feedbackCoverageMetric')
+    feedbackCoverageMetric: document.getElementById('feedbackCoverageMetric'),
+    configurationForm: document.getElementById('configurationForm'),
+    configurationName: document.getElementById('configurationName'),
+    configurationModel: document.getElementById('configurationModel'),
+    configurationTemperature: document.getElementById('configurationTemperature'),
+    configurationPrompt: document.getElementById('configurationPrompt'),
+    createConfigurationBtn: document.getElementById('createConfigurationBtn'),
+    experimentForm: document.getElementById('experimentForm'),
+    experimentName: document.getElementById('experimentName'),
+    variantAConfig: document.getElementById('variantAConfig'),
+    variantAWeight: document.getElementById('variantAWeight'),
+    variantBConfig: document.getElementById('variantBConfig'),
+    variantBWeight: document.getElementById('variantBWeight'),
+    createExperimentBtn: document.getElementById('createExperimentBtn'),
+    experimentList: document.getElementById('experimentList')
 };
 
 // Application state
 let currentFeedbackMessageId = null;
 let currentSessionId = null;
+let activeConfigs = [];
+let experimentDefinitions = [];
+let experimentMetrics = [];
 
 // Utility functions
 function showStatus(message, type = 'success') {
@@ -781,17 +798,227 @@ function renderSummaryMetrics(configurations) {
         : '0%';
 }
 
+function renderExperimentConfigOptions(configs) {
+    const currentA = elements.variantAConfig.value;
+    const currentB = elements.variantBConfig.value;
+    const options = configs.map(config =>
+        `<option value="${config.id}">${escapeHtml(config.name)}</option>`
+    ).join('');
+    elements.variantAConfig.innerHTML = options ||
+        '<option value="">Create two active configurations first</option>';
+    elements.variantBConfig.innerHTML = options ||
+        '<option value="">Create two active configurations first</option>';
+
+    if (configs.some(config => String(config.id) === currentA)) {
+        elements.variantAConfig.value = currentA;
+    }
+    if (configs.some(config => String(config.id) === currentB)) {
+        elements.variantBConfig.value = currentB;
+    } else if (configs.length > 1) {
+        elements.variantBConfig.value = String(configs[1].id);
+    }
+    if (
+        configs.length > 1 &&
+        elements.variantBConfig.value === elements.variantAConfig.value
+    ) {
+        const alternative = configs.find(
+            config => String(config.id) !== elements.variantAConfig.value
+        );
+        elements.variantBConfig.value = String(alternative.id);
+    }
+    elements.createExperimentBtn.disabled = configs.length < 2;
+}
+
+function renderExperiments() {
+    if (!experimentDefinitions.length) {
+        elements.experimentList.innerHTML =
+            '<div class="dashboard-empty">No experiments yet. Create a draft above.</div>';
+        return;
+    }
+
+    const metricsById = new Map(
+        experimentMetrics.map(metric => [metric.experiment_id, metric])
+    );
+    elements.experimentList.innerHTML = experimentDefinitions.map(experiment => {
+        const metrics = metricsById.get(experiment.id);
+        const variants = metrics?.variants || experiment.variants.map(variant => {
+            const config = activeConfigs.find(item => item.id === variant.config_id);
+            return {
+                ...variant,
+                config_name: config?.name || `Config ${variant.config_id}`,
+                sessions: 0,
+                approval_rate: null,
+                feedback_coverage: 0,
+                actual_allocation: 0
+            };
+        });
+        const rows = variants.map(variant => `
+            <tr>
+                <td><strong>${escapeHtml(variant.config_name)}</strong></td>
+                <td>${variant.weight}%</td>
+                <td>${variant.sessions}</td>
+                <td>${formatPercent(variant.actual_allocation)}</td>
+                <td>${formatPercent(variant.approval_rate)}</td>
+                <td>${formatPercent(variant.feedback_coverage)}</td>
+            </tr>
+        `).join('');
+        const action = experiment.status === 'active'
+            ? `<button class="btn btn-small" data-experiment-action="pause" data-experiment-id="${experiment.id}">Pause</button>`
+            : experiment.status !== 'completed'
+                ? `<button class="btn btn-small" data-experiment-action="activate" data-experiment-id="${experiment.id}">Activate</button>`
+                : '';
+        return `
+            <article class="experiment-card">
+                <div class="experiment-card-header">
+                    <div>
+                        <strong>${escapeHtml(experiment.name)}</strong>
+                        <div>${metrics?.total_sessions || 0} assigned session(s)</div>
+                    </div>
+                    <div class="experiment-card-actions">
+                        <span class="experiment-badge ${experiment.status === 'active' ? 'active' : ''}">${escapeHtml(experiment.status)}</span>
+                        ${action}
+                    </div>
+                </div>
+                <table class="analytics-table">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Target</th>
+                            <th>Sessions</th>
+                            <th>Actual</th>
+                            <th>Approval</th>
+                            <th>Coverage</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </article>
+        `;
+    }).join('');
+}
+
+async function createConfiguration(event) {
+    event.preventDefault();
+    const name = elements.configurationName.value.trim();
+    const model = elements.configurationModel.value.trim();
+    const systemPrompt = elements.configurationPrompt.value.trim();
+    const temperature = Number(elements.configurationTemperature.value);
+    if (!name || !model || !systemPrompt) {
+        showAnalyticsStatus(
+            'Configuration name, model, and system prompt are required.',
+            'error'
+        );
+        return;
+    }
+    if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
+        showAnalyticsStatus('Temperature must be between 0 and 2.', 'error');
+        return;
+    }
+
+    elements.createConfigurationBtn.disabled = true;
+    try {
+        await api.post('/configs', {
+            name,
+            config_json: {
+                system_prompt: systemPrompt,
+                model,
+                temperature
+            },
+            is_active: true,
+            tags: ['experiment']
+        });
+        elements.configurationName.value = '';
+        elements.configurationPrompt.value = '';
+        showAnalyticsStatus('Configuration added and ready for experiments.');
+        await loadAnalytics();
+    } catch (error) {
+        showAnalyticsStatus(`Configuration error: ${error.message}`, 'error');
+    } finally {
+        elements.createConfigurationBtn.disabled = false;
+    }
+}
+
+async function createExperiment(event) {
+    event.preventDefault();
+    const name = elements.experimentName.value.trim();
+    const configA = Number(elements.variantAConfig.value);
+    const configB = Number(elements.variantBConfig.value);
+    const weightA = Number(elements.variantAWeight.value);
+    const weightB = Number(elements.variantBWeight.value);
+
+    if (!name || !configA || !configB) {
+        showAnalyticsStatus('Enter a name and select two configurations.', 'error');
+        return;
+    }
+    if (configA === configB) {
+        showAnalyticsStatus('Variant A and B must use different configurations.', 'error');
+        return;
+    }
+    if (weightA + weightB !== 100) {
+        showAnalyticsStatus('Variant weights must total 100%.', 'error');
+        return;
+    }
+
+    elements.createExperimentBtn.disabled = true;
+    try {
+        await api.post('/experiments', {
+            name,
+            variants: [
+                {config_id: configA, weight: weightA},
+                {config_id: configB, weight: weightB}
+            ]
+        });
+        elements.experimentName.value = '';
+        showAnalyticsStatus('Experiment draft created.');
+        await loadAnalytics();
+    } catch (error) {
+        showAnalyticsStatus(`Experiment error: ${error.message}`, 'error');
+    } finally {
+        elements.createExperimentBtn.disabled = activeConfigs.length < 2;
+    }
+}
+
+async function handleExperimentAction(event) {
+    const button = event.target.closest('[data-experiment-action]');
+    if (!button) {
+        return;
+    }
+    const experimentId = button.dataset.experimentId;
+    const action = button.dataset.experimentAction;
+    button.disabled = true;
+    try {
+        await api.post(`/experiments/${experimentId}/${action}`);
+        showAnalyticsStatus(
+            action === 'activate'
+                ? 'Experiment activated for new sessions.'
+                : 'Experiment paused. Existing sessions remain attributed.'
+        );
+        await loadAnalytics();
+    } catch (error) {
+        showAnalyticsStatus(`Experiment error: ${error.message}`, 'error');
+        button.disabled = false;
+    }
+}
+
 async function loadAnalytics() {
     elements.refreshAnalyticsBtn.disabled = true;
     showAnalyticsStatus('Loading analytics...');
 
     try {
-        const [configurations, negativeFeedback] = await Promise.all([
+        const [configurations, negativeFeedback, experiments, experimentAnalytics, configs] = await Promise.all([
             api.get('/analytics/configurations'),
-            api.get('/analytics/negative-feedback?limit=20')
+            api.get('/analytics/negative-feedback?limit=20'),
+            api.get('/experiments'),
+            api.get('/analytics/experiments'),
+            api.get('/configs?active_only=true&size=100')
         ]);
 
+        activeConfigs = configs.items;
+        experimentDefinitions = experiments;
+        experimentMetrics = experimentAnalytics;
         renderSummaryMetrics(configurations);
+        renderExperimentConfigOptions(activeConfigs);
+        renderExperiments();
         renderConfigurationAnalytics(configurations);
         renderNegativeFeedback(negativeFeedback);
         showAnalyticsStatus(`Loaded ${configurations.length} configuration result(s).`);
@@ -835,6 +1062,9 @@ elements.chatViewBtn.addEventListener('click', () => setActiveView('chat'));
 elements.analyticsViewBtn.addEventListener('click', () => setActiveView('analytics'));
 elements.refreshAnalyticsBtn.addEventListener('click', loadAnalytics);
 elements.saveTokenBtn.addEventListener('click', saveAnalyticsToken);
+elements.configurationForm.addEventListener('submit', createConfiguration);
+elements.experimentForm.addEventListener('submit', createExperiment);
+elements.experimentList.addEventListener('click', handleExperimentAction);
 
 // Initialize
 console.log('Data Flywheel Chatbot initialized');

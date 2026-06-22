@@ -23,6 +23,7 @@ from .models import ChatHistory, Feedback, ChatbotConfig
 from .schemas import ChatRequest, FeedbackCreate, ChatbotConfigCreate, ChatbotConfigOut
 from .knowledge_processor import KnowledgeProcessor
 from .auth import verify_bearer_token
+from .experiments import select_chat_configuration
 from .services.llm import llm, chat
 
 # Initialize settings and logging
@@ -83,6 +84,7 @@ async def submit_feedback(request: FeedbackCreate, db: Session = Depends(get_db)
 
         response = None
         config_id = None
+        experiment_id = None
         if request.response_id is not None:
             response = (
                 db.query(ChatHistory)
@@ -98,6 +100,7 @@ async def submit_feedback(request: FeedbackCreate, db: Session = Depends(get_db)
                     detail="Assistant response not found",
                 )
             config_id = response.config_id
+            experiment_id = response.experiment_id
 
         feedback = Feedback(
             message=sanitized_message,
@@ -105,6 +108,7 @@ async def submit_feedback(request: FeedbackCreate, db: Session = Depends(get_db)
             comment=sanitized_comment,
             response_id=request.response_id,
             config_id=config_id,
+            experiment_id=experiment_id,
         )
 
         db.add(feedback)
@@ -166,6 +170,7 @@ async def get_feedback(
                 "comment": f.comment,
                 "response_id": f.response_id,
                 "config_id": f.config_id,
+                "experiment_id": f.experiment_id,
                 "timestamp": f.timestamp.isoformat()
             }
             for f in feedback_entries
@@ -225,11 +230,12 @@ async def chat_with_bot(
             )
 
         local_settings = get_settings()
-        config = (
-            db.query(ChatbotConfig)
-            .filter(ChatbotConfig.is_active.is_(True))
-            .order_by(ChatbotConfig.updated_at.desc())
-            .first()
+        is_new_session = request.session_id is None
+        session_id = request.session_id or str(uuid.uuid4())
+        config, experiment = select_chat_configuration(
+            db,
+            session_id,
+            is_new_session=is_new_session,
         )
 
         lower_message = sanitized_message.lower()
@@ -241,13 +247,13 @@ async def chat_with_bot(
             "tell me the time",
         )
         if any(trigger in lower_message for trigger in time_triggers):
-            session_id = request.session_id or str(uuid.uuid4())
             user_chat = ChatHistory(
                 session_id=session_id,
                 role="user",
                 content=sanitized_message,
                 user_id=request.user_id,
                 config_id=config.id if config else None,
+                experiment_id=experiment.id if experiment else None,
             )
             db.add(user_chat)
             db.commit()
@@ -261,6 +267,7 @@ async def chat_with_bot(
                 role="assistant",
                 content=reply_text,
                 config_id=config.id if config else None,
+                experiment_id=experiment.id if experiment else None,
                 model_name="system-clock",
                 latency_ms=0,
             )
@@ -277,6 +284,8 @@ async def chat_with_bot(
                         "session_id": user_chat.session_id,
                         "assistant_message_id": assistant_chat.id,
                         "config_id": config.id if config else None,
+                        "experiment_id": experiment.id if experiment else None,
+                        "experiment_name": experiment.name if experiment else None,
                         "model": "system-clock",
                     }
                     yield f"data: {json.dumps(payload)}\n\n"
@@ -297,6 +306,8 @@ async def chat_with_bot(
                 "session_id": user_chat.session_id,
                 "assistant_message_id": assistant_chat.id,
                 "config_id": config.id if config else None,
+                "experiment_id": experiment.id if experiment else None,
+                "experiment_name": experiment.name if experiment else None,
                 "model": "system-clock",
             }
 
@@ -356,11 +367,12 @@ async def chat_with_bot(
 
         # Save user message to database
         user_chat = ChatHistory(
-            session_id=request.session_id or str(uuid.uuid4()),
+            session_id=session_id,
             role='user',
             content=sanitized_message,
             user_id=request.user_id,
             config_id=config.id if config else None,
+            experiment_id=experiment.id if experiment else None,
         )
         db.add(user_chat)
         db.commit()  # Commit user message before streaming to prevent data loss
@@ -374,6 +386,8 @@ async def chat_with_bot(
                     "reply": "",
                     "session_id": user_chat.session_id,
                     "config_id": config.id if config else None,
+                    "experiment_id": experiment.id if experiment else None,
+                    "experiment_name": experiment.name if experiment else None,
                     "model": model,
                 }
                 start_time = time.time()
@@ -414,6 +428,7 @@ async def chat_with_bot(
                                     role='assistant',
                                     content=full_response,
                                     config_id=config.id if config else None,
+                                    experiment_id=experiment.id if experiment else None,
                                     model_name=model,
                                     latency_ms=int((time.time() - start_time) * 1000),
                                 )
@@ -496,6 +511,7 @@ async def chat_with_bot(
             role='assistant',
             content=reply,
             config_id=config.id if config else None,
+            experiment_id=experiment.id if experiment else None,
             model_name=model,
             latency_ms=llm_response.get(
                 "latency_ms",
@@ -512,6 +528,8 @@ async def chat_with_bot(
             "session_id": user_chat.session_id,
             "assistant_message_id": assistant_chat.id,
             "config_id": config.id if config else None,
+            "experiment_id": experiment.id if experiment else None,
+            "experiment_name": experiment.name if experiment else None,
             "model": model,
         }
 

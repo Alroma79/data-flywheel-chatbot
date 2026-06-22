@@ -107,6 +107,66 @@ class FeedbackCreate(BaseModel):
     )
 
 
+class ExperimentStatus(str, Enum):
+    """Lifecycle state for a configuration experiment."""
+
+    draft = "draft"
+    active = "active"
+    paused = "paused"
+    completed = "completed"
+
+
+class ExperimentVariant(BaseModel):
+    """One weighted configuration variant."""
+
+    config_id: int = Field(..., ge=1)
+    weight: int = Field(..., ge=1, le=99)
+
+
+class ExperimentCreate(BaseModel):
+    """Create a weighted A/B configuration experiment."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    variants: List[ExperimentVariant] = Field(..., min_length=2)
+
+    @field_validator("variants")
+    @classmethod
+    def validate_variants(cls, variants):
+        config_ids = [variant.config_id for variant in variants]
+        if len(config_ids) != len(set(config_ids)):
+            raise ValueError("Each configuration can appear only once")
+        if sum(variant.weight for variant in variants) != 100:
+            raise ValueError("Variant weights must total 100")
+        return variants
+
+
+class ExperimentUpdate(BaseModel):
+    """Update experiment metadata or weighted variants."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    variants: Optional[List[ExperimentVariant]] = Field(None, min_length=2)
+
+    @field_validator("variants")
+    @classmethod
+    def validate_variants(cls, variants):
+        if variants is None:
+            return variants
+        return ExperimentCreate(name="validation", variants=variants).variants
+
+
+class ExperimentOut(BaseModel):
+    """Experiment API response."""
+
+    id: int
+    name: str
+    status: ExperimentStatus
+    variants: List[ExperimentVariant]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ChatbotConfigBase(BaseModel):
     """
     Base schema for chatbot configuration.
@@ -162,7 +222,10 @@ class ChatbotConfigBase(BaseModel):
         for field in required_fields:
             if field not in v:
                 raise ValueError(f'Missing required field: {field}')
-        if not 0 <= v.get('temperature', 0.7) <= 2:
+        temperature = v.get('temperature')
+        if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+            raise ValueError('Temperature must be a number between 0 and 2')
+        if not 0 <= temperature <= 2:
             raise ValueError('Temperature must be between 0 and 2')
         if not str(v.get('system_prompt', '')).strip():
             raise ValueError('system_prompt cannot be empty')
@@ -203,8 +266,12 @@ class ChatbotConfigUpdate(BaseModel):
         """Validate configuration fields if provided."""
         if v is None:
             return v
-        if 'temperature' in v and not 0 <= v['temperature'] <= 2:
-            raise ValueError('Temperature must be between 0 and 2')
+        if 'temperature' in v:
+            temperature = v['temperature']
+            if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+                raise ValueError('Temperature must be a number between 0 and 2')
+            if not 0 <= temperature <= 2:
+                raise ValueError('Temperature must be between 0 and 2')
         if 'system_prompt' in v and not str(v['system_prompt']).strip():
             raise ValueError('system_prompt cannot be empty')
         if 'model' in v and not str(v['model']).strip():

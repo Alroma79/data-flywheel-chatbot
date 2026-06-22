@@ -42,6 +42,13 @@ class Feedback(Base):
         index=True,
         comment="Configuration attributed to the rated response",
     )
+    experiment_id = Column(
+        Integer,
+        ForeignKey("experiments.id"),
+        nullable=True,
+        index=True,
+        comment="Experiment attributed to the rated response",
+    )
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), comment="Feedback submission time")
 
     def __repr__(self) -> str:
@@ -75,6 +82,13 @@ class ChatHistory(Base):
         index=True,
         comment="Configuration used for this message",
     )
+    experiment_id = Column(
+        Integer,
+        ForeignKey("experiments.id"),
+        nullable=True,
+        index=True,
+        comment="A/B experiment used for this message",
+    )
     model_name = Column(String(100), nullable=True, comment="Model used for assistant responses")
     latency_ms = Column(Integer, nullable=True, comment="Assistant response latency in milliseconds")
 
@@ -107,6 +121,41 @@ class ChatbotConfig(Base):
 
     def __repr__(self) -> str:
         return f"<ChatbotConfig(id={self.id}, name={self.name}, is_active={self.is_active})>"
+
+
+class Experiment(Base):
+    """Weighted A/B experiment over two or more chatbot configurations."""
+
+    __tablename__ = "experiments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, comment="Experiment name")
+    status = Column(
+        String(20),
+        nullable=False,
+        default="draft",
+        index=True,
+        comment="draft, active, paused, or completed",
+    )
+    variants = Column(
+        JSON,
+        nullable=False,
+        comment="Weighted variants: [{config_id, weight}]",
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        comment="Experiment creation time",
+    )
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        comment="Last update timestamp",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Experiment(id={self.id}, name={self.name}, status={self.status})>"
 
 
 class KnowledgeFile(Base):

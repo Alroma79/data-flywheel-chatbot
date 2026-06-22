@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.exceptions import RequestValidationError
@@ -22,6 +23,7 @@ from .routes import router
 from .routes_configs import router as configs_router
 from .routes_knowledge import router as knowledge_router
 from .routes_analytics import router as analytics_router
+from .routes_experiments import router as experiments_router
 from .demo_seed import seed_demo
 from .init_db import init_database
 
@@ -93,12 +95,16 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     logger.error(f"Validation error: {exc.errors()}")
+    validation_errors = jsonable_encoder(
+        exc.errors(),
+        custom_encoder={ValueError: str},
+    )
     return JSONResponse(
         status_code=422,
         content={
             "error": True,
             "message": "Request validation failed",
-            "details": exc.errors() if settings.debug else None,
+            "details": validation_errors if settings.debug else None,
         },
     )
 
@@ -129,6 +135,7 @@ app.include_router(router, prefix="/api/v1")
 app.include_router(configs_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(experiments_router, prefix="/api/v1")
 
 # Database path logging for debugging
 try:

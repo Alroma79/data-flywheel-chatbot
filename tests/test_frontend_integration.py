@@ -44,11 +44,17 @@ class TestFrontendIntegration:
         assert 'id="configurationAnalytics"' in response.text
         assert 'id="negativeFeedbackList"' in response.text
         assert 'id="analyticsToken"' in response.text
+        assert 'id="configurationForm"' in response.text
+        assert 'id="experimentForm"' in response.text
+        assert 'id="experimentList"' in response.text
 
         script_response = test_client.get("/app.js")
         assert script_response.status_code == 200
         assert "window.location" in script_response.text
         assert "return `${origin}/api/v1`" in script_response.text
+        assert "createExperiment" in script_response.text
+        assert "handleExperimentAction" in script_response.text
+        assert "Number.isNaN(temperature)" in script_response.text
 
     # API Accessibility Tests
 
