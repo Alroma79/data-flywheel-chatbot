@@ -1,5 +1,7 @@
 """Internal analytics for the feedback-driven data flywheel."""
 
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -114,19 +116,36 @@ async def negative_feedback_examples(
         .all()
     )
 
+    session_ids = {
+        response.session_id
+        for _, response, _ in rows
+        if response is not None and response.session_id
+    }
+    prompts_by_session = defaultdict(list)
+    if session_ids:
+        user_messages = (
+            db.query(ChatHistory)
+            .filter(
+                ChatHistory.session_id.in_(session_ids),
+                ChatHistory.role == "user",
+            )
+            .order_by(ChatHistory.session_id, ChatHistory.id.desc())
+            .all()
+        )
+        for message in user_messages:
+            prompts_by_session[message.session_id].append(message)
+
     results = []
     for feedback, response, config in rows:
         prompt = None
         if response is not None:
-            prompt_message = (
-                db.query(ChatHistory)
-                .filter(
-                    ChatHistory.session_id == response.session_id,
-                    ChatHistory.role == "user",
-                    ChatHistory.id < response.id,
-                )
-                .order_by(ChatHistory.id.desc())
-                .first()
+            prompt_message = next(
+                (
+                    message
+                    for message in prompts_by_session.get(response.session_id, [])
+                    if message.id < response.id
+                ),
+                None,
             )
             prompt = prompt_message.content if prompt_message else None
 

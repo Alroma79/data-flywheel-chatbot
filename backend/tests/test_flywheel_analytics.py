@@ -1,7 +1,8 @@
 """Integration tests for response attribution and flywheel analytics."""
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 
+from app.db import engine
 from app.migrations.add_flywheel_attribution import run_migration
 
 
@@ -92,6 +93,67 @@ def test_feedback_rejects_unknown_assistant_response(test_client):
     )
 
     assert response.status_code == 404
+
+
+def test_session_deletion_preserves_attributed_feedback(test_client, mock_llm):
+    chat_data = test_client.post(
+        "/api/v1/chat",
+        json={"message": "Response that will outlive its session"},
+    ).json()
+    feedback_response = test_client.post(
+        "/api/v1/feedback",
+        json={
+            "message": chat_data["reply"],
+            "response_id": chat_data["assistant_message_id"],
+            "user_feedback": "thumbs_down",
+            "comment": "Keep this feedback for aggregate analytics",
+        },
+    )
+    assert feedback_response.status_code == 201
+
+    delete_response = test_client.delete(
+        f"/api/v1/sessions/{chat_data['session_id']}"
+    )
+    assert delete_response.status_code == 200
+
+    feedback_entries = test_client.get("/api/v1/feedback").json()
+    assert len(feedback_entries) == 1
+    assert feedback_entries[0]["response_id"] is None
+    assert feedback_entries[0]["config_id"] == chat_data["config_id"]
+
+
+def test_negative_feedback_uses_bounded_query_count(test_client, mock_llm):
+    for index in range(3):
+        chat_data = test_client.post(
+            "/api/v1/chat",
+            json={"message": f"Prompt needing improvement {index}"},
+        ).json()
+        response = test_client.post(
+            "/api/v1/feedback",
+            json={
+                "message": chat_data["reply"],
+                "response_id": chat_data["assistant_message_id"],
+                "user_feedback": "thumbs_down",
+            },
+        )
+        assert response.status_code == 201
+
+    select_count = 0
+
+    def count_selects(_conn, _cursor, statement, _parameters, _context, _many):
+        nonlocal select_count
+        if statement.lstrip().upper().startswith("SELECT"):
+            select_count += 1
+
+    event.listen(engine, "before_cursor_execute", count_selects)
+    try:
+        response = test_client.get("/api/v1/analytics/negative-feedback")
+    finally:
+        event.remove(engine, "before_cursor_execute", count_selects)
+
+    assert response.status_code == 200
+    assert len(response.json()) == 3
+    assert select_count == 2
 
 
 def test_attribution_migration_upgrades_existing_database(tmp_path):

@@ -653,6 +653,23 @@ async def delete_session(
         Confirmation of deletion
     """
     try:
+        message_ids = [
+            message_id
+            for (message_id,) in (
+                db.query(ChatHistory.id)
+                .filter(ChatHistory.session_id == session_id)
+                .all()
+            )
+        ]
+        if message_ids:
+            (
+                db.query(Feedback)
+                .filter(Feedback.response_id.in_(message_ids))
+                .update(
+                    {Feedback.response_id: None},
+                    synchronize_session=False,
+                )
+            )
         db.query(ChatHistory).filter(ChatHistory.session_id == session_id).delete()
         db.commit()
         return {"status": "deleted", "session_id": session_id}

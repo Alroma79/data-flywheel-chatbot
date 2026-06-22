@@ -30,7 +30,7 @@ class Feedback(Base):
     comment = Column(Text, nullable=True, comment="Optional user comment")
     response_id = Column(
         Integer,
-        ForeignKey("chat_history.id"),
+        ForeignKey("chat_history.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
         comment="Assistant response being rated",
