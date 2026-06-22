@@ -36,7 +36,7 @@ jobs:
           -e DEBUG=true \
           -e PYTHONPATH=/app/backend \
           --workdir /app \
-          flywheel:test python -m pytest tests/ -q --tb=short
+          flywheel:test python -m pytest -q --tb=short
           
     - name: Test Docker Compose
       run: |

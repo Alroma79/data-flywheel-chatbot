@@ -6,10 +6,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app
-      - ./frontend:/frontend
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key-for-testing}
       - DATABASE_URL=${DATABASE_URL:-sqlite:///./chatbot.db}
@@ -47,8 +48,10 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./backend/app:/app
-      - ./tests:/tests
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
     environment:
       - OPENAI_API_KEY=sk-test-key-for-testing
       - DATABASE_URL=sqlite:///./test_chatbot.db
@@ -56,7 +59,8 @@ services:
       - DEFAULT_TEMPERATURE=0.7
       - CORS_ORIGINS=["*"]
       - DEBUG=true
-    command: ["python", "-m", "pytest", "/tests/", "-q", "--tb=short"]
+    working_dir: /app
+    command: ["python", "-m", "pytest", "-q", "--tb=short"]
     profiles:
       - test
 

@@ -30,19 +30,21 @@ class TestStreamingIntegration:
         """
         Validate that tokens are generated incrementally during streaming.
         """
-        def mock_streaming_chat(messages, **kwargs):
-            tokens = ["Hello", " world", "!"]
-            for token in tokens:
-                yield token
+        async def mock_streaming_chat(messages, **kwargs):
+            async def token_generator():
+                tokens = ["Hello", " world", "!"]
+                for token in tokens:
+                    yield token
 
-            # Simulate end of stream metadata
-            yield json.dumps({
-                'content': "Hello world!",
-                'usage': {'total_tokens': len(tokens)},
-                'latency_ms': 50
-            })
+                yield {
+                    'content': "Hello world!",
+                    'usage': {'total_tokens': len(tokens)},
+                    'latency_ms': 50
+                }
 
-        with patch('app.services.llm.chat', side_effect=mock_streaming_chat):
+            return token_generator()
+
+        with patch('app.routes.chat', side_effect=mock_streaming_chat):
             payload = {
                 "message": "Generate streaming response",
                 "stream": True
@@ -83,6 +85,8 @@ class TestStreamingIntegration:
             full_response = streamed_data[-1]
             assert 'reply' in full_response
             assert len(full_response['reply']) > 0
+            assert full_response['assistant_message_id'] > 0
+            assert full_response['config_id'] > 0
 
     def test_streaming_knowledge_sources(self, test_client, mock_knowledge_processor):
         """
@@ -127,7 +131,7 @@ class TestStreamingIntegration:
         """
         Ensure streaming errors are properly handled and returned.
         """
-        with patch('app.services.llm.chat', side_effect=Exception("Streaming simulation error")):
+        with patch('app.routes.chat', side_effect=Exception("Streaming simulation error")):
             payload = {
                 "message": "Trigger streaming error",
                 "stream": True

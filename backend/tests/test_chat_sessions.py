@@ -35,7 +35,7 @@ def mock_openai(monkeypatch):
     monkeypatch.setattr('app.routes.KnowledgeProcessor', lambda: mock_knowledge_processor)
 
     # Mock the LLM service to return test responses
-    def mock_llm_chat(messages, **kwargs):
+    async def mock_llm_chat(messages, **kwargs):
         user_message = messages[-1]['content'] if messages else "test"
         return {
             'content': f"Response to: {user_message}",
@@ -43,8 +43,8 @@ def mock_openai(monkeypatch):
             'latency_ms': 50
         }
 
-    # Patch the llm service
-    monkeypatch.setattr('app.routes.llm.chat', mock_llm_chat)
+    # routes.py imports chat directly, so patch the symbol used by the route.
+    monkeypatch.setattr('app.routes.chat', mock_llm_chat)
     yield
 
 def test_chat_without_session_id(mock_openai):

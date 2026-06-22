@@ -6,10 +6,13 @@ Provides centralized bearer token verification for protected endpoints.
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import os
+from typing import Optional
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-def verify_bearer_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+def verify_bearer_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+):
     """
     Verify bearer token for protected endpoints.
     

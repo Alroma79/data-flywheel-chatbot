@@ -28,6 +28,20 @@ class Feedback(Base):
     message = Column(Text, nullable=False, comment="Original message that was rated")
     user_feedback = Column(String(50), nullable=True, comment="User rating (thumbs_up/thumbs_down)")
     comment = Column(Text, nullable=True, comment="Optional user comment")
+    response_id = Column(
+        Integer,
+        ForeignKey("chat_history.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Assistant response being rated",
+    )
+    config_id = Column(
+        Integer,
+        ForeignKey("chatbot_config.id"),
+        nullable=True,
+        index=True,
+        comment="Configuration attributed to the rated response",
+    )
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), comment="Feedback submission time")
 
     def __repr__(self) -> str:
@@ -54,6 +68,15 @@ class ChatHistory(Base):
     content = Column(Text, nullable=False, comment="Message content")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="Message timestamp")
     user_id = Column(String(100), nullable=True, comment="Optional user identifier")
+    config_id = Column(
+        Integer,
+        ForeignKey("chatbot_config.id"),
+        nullable=True,
+        index=True,
+        comment="Configuration used for this message",
+    )
+    model_name = Column(String(100), nullable=True, comment="Model used for assistant responses")
+    latency_ms = Column(Integer, nullable=True, comment="Assistant response latency in milliseconds")
 
     def __repr__(self) -> str:
         return f"<ChatHistory(id={self.id}, role={self.role}, session_id={self.session_id})>"

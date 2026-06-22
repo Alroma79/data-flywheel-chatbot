@@ -81,10 +81,30 @@ async def submit_feedback(request: FeedbackCreate, db: Session = Depends(get_db)
         sanitized_message = sanitize_user_input(request.message)
         sanitized_comment = sanitize_user_input(request.comment) if request.comment else None
 
+        response = None
+        config_id = None
+        if request.response_id is not None:
+            response = (
+                db.query(ChatHistory)
+                .filter(
+                    ChatHistory.id == request.response_id,
+                    ChatHistory.role == "assistant",
+                )
+                .first()
+            )
+            if response is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Assistant response not found",
+                )
+            config_id = response.config_id
+
         feedback = Feedback(
             message=sanitized_message,
             user_feedback=request.user_feedback,
-            comment=sanitized_comment
+            comment=sanitized_comment,
+            response_id=request.response_id,
+            config_id=config_id,
         )
 
         db.add(feedback)
@@ -94,6 +114,8 @@ async def submit_feedback(request: FeedbackCreate, db: Session = Depends(get_db)
         logger.info(f"Feedback submitted successfully with ID: {feedback.id}")
         return {"status": "success", "id": feedback.id}
 
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         logger.error(f"Database error while submitting feedback: {str(e)}")
         db.rollback()
@@ -142,6 +164,8 @@ async def get_feedback(
                 "message": f.message,
                 "user_feedback": f.user_feedback,
                 "comment": f.comment,
+                "response_id": f.response_id,
+                "config_id": f.config_id,
                 "timestamp": f.timestamp.isoformat()
             }
             for f in feedback_entries
@@ -200,6 +224,14 @@ async def chat_with_bot(
                 detail="Message cannot be empty"
             )
 
+        local_settings = get_settings()
+        config = (
+            db.query(ChatbotConfig)
+            .filter(ChatbotConfig.is_active.is_(True))
+            .order_by(ChatbotConfig.updated_at.desc())
+            .first()
+        )
+
         lower_message = sanitized_message.lower()
         time_triggers = (
             "what time is it",
@@ -215,6 +247,7 @@ async def chat_with_bot(
                 role="user",
                 content=sanitized_message,
                 user_id=request.user_id,
+                config_id=config.id if config else None,
             )
             db.add(user_chat)
             db.commit()
@@ -227,15 +260,25 @@ async def chat_with_bot(
                 session_id=user_chat.session_id,
                 role="assistant",
                 content=reply_text,
+                config_id=config.id if config else None,
+                model_name="system-clock",
+                latency_ms=0,
             )
             db.add(assistant_chat)
             db.commit()
+            db.refresh(assistant_chat)
 
             logger.info(f"Handled time request with direct response: {current_time_iso}")
 
             if stream:
                 async def stream_time():
-                    payload = {"reply": reply_text, "session_id": user_chat.session_id}
+                    payload = {
+                        "reply": reply_text,
+                        "session_id": user_chat.session_id,
+                        "assistant_message_id": assistant_chat.id,
+                        "config_id": config.id if config else None,
+                        "model": "system-clock",
+                    }
                     yield f"data: {json.dumps(payload)}\n\n"
 
                 headers = {
@@ -249,7 +292,13 @@ async def chat_with_bot(
                     headers=headers,
                 )
 
-            return {"reply": reply_text, "session_id": user_chat.session_id}
+            return {
+                "reply": reply_text,
+                "session_id": user_chat.session_id,
+                "assistant_message_id": assistant_chat.id,
+                "config_id": config.id if config else None,
+                "model": "system-clock",
+            }
 
         # Search knowledge base for relevant information
         knowledge_processor = KnowledgeProcessor()
@@ -258,9 +307,6 @@ async def chat_with_bot(
         logger.info(f"Found {len(knowledge_snippets)} relevant knowledge snippets")
 
         # Load latest chatbot configuration
-        local_settings = get_settings()
-        config = db.query(ChatbotConfig).order_by(ChatbotConfig.updated_at.desc()).first()
-
         if config:
             base_system_prompt = config.config_json.get("system_prompt", "You are a helpful and adaptive assistant.")
             temperature = config.config_json.get("temperature", local_settings.default_temperature)
@@ -313,7 +359,8 @@ async def chat_with_bot(
             session_id=request.session_id or str(uuid.uuid4()),
             role='user',
             content=sanitized_message,
-            user_id=request.user_id
+            user_id=request.user_id,
+            config_id=config.id if config else None,
         )
         db.add(user_chat)
         db.commit()  # Commit user message before streaming to prevent data loss
@@ -323,7 +370,12 @@ async def chat_with_bot(
         if stream:
             async def generate_response():
                 full_response = ""
-                response_data = {"reply": "", "session_id": user_chat.session_id}
+                response_data = {
+                    "reply": "",
+                    "session_id": user_chat.session_id,
+                    "config_id": config.id if config else None,
+                    "model": model,
+                }
                 start_time = time.time()
                 total_tokens = 0
 
@@ -360,13 +412,19 @@ async def chat_with_bot(
                                 assistant_chat = ChatHistory(
                                     session_id=user_chat.session_id,
                                     role='assistant',
-                                    content=full_response
+                                    content=full_response,
+                                    config_id=config.id if config else None,
+                                    model_name=model,
+                                    latency_ms=int((time.time() - start_time) * 1000),
                                 )
                                 db.add(assistant_chat)
                                 db.commit()
+                                db.refresh(assistant_chat)
+                                response_data["assistant_message_id"] = assistant_chat.id
+                                yield f"data: {json.dumps(response_data)}\n\n"
 
                                 # Log streaming performance
-                                latency_ms = int((time.time() - start_time) * 1000)
+                                latency_ms = assistant_chat.latency_ms
                                 logger.info(
                                     f"Streamed chat processed. "
                                     f"Session: {user_chat.session_id}, "
@@ -408,6 +466,7 @@ async def chat_with_bot(
             )
 
         # Non-streaming response
+        start_time = time.time()
         llm_response = await chat(
             messages=messages,
             model=model,
@@ -435,13 +494,26 @@ async def chat_with_bot(
         assistant_chat = ChatHistory(
             session_id=user_chat.session_id,
             role='assistant',
-            content=reply
+            content=reply,
+            config_id=config.id if config else None,
+            model_name=model,
+            latency_ms=llm_response.get(
+                "latency_ms",
+                int((time.time() - start_time) * 1000),
+            ),
         )
         db.add(assistant_chat)
         db.commit()
+        db.refresh(assistant_chat)
 
         logger.info(f"Chat processed successfully. Session ID: {user_chat.session_id}")
-        return {**response_data, "session_id": user_chat.session_id}
+        return {
+            **response_data,
+            "session_id": user_chat.session_id,
+            "assistant_message_id": assistant_chat.id,
+            "config_id": config.id if config else None,
+            "model": model,
+        }
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -505,6 +577,9 @@ async def get_chat_history(
                 "session_id": h.session_id,
                 "role": h.role,
                 "content": h.content,
+                "config_id": h.config_id,
+                "model": h.model_name,
+                "latency_ms": h.latency_ms,
                 "created_at": h.created_at.isoformat()
             }
             for h in history
@@ -578,6 +653,23 @@ async def delete_session(
         Confirmation of deletion
     """
     try:
+        message_ids = [
+            message_id
+            for (message_id,) in (
+                db.query(ChatHistory.id)
+                .filter(ChatHistory.session_id == session_id)
+                .all()
+            )
+        ]
+        if message_ids:
+            (
+                db.query(Feedback)
+                .filter(Feedback.response_id.in_(message_ids))
+                .update(
+                    {Feedback.response_id: None},
+                    synchronize_session=False,
+                )
+            )
         db.query(ChatHistory).filter(ChatHistory.session_id == session_id).delete()
         db.commit()
         return {"status": "deleted", "session_id": session_id}

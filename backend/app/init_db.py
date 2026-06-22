@@ -28,6 +28,15 @@ def apply_migrations(db_path: str) -> None:
         raise
 
 
+def apply_attribution_migration() -> None:
+    """Add flywheel attribution columns on supported database backends."""
+    from .migrations.add_flywheel_attribution import run_migration
+
+    applied = run_migration(engine)
+    if applied:
+        logger.info(f"Applied attribution migrations: {', '.join(applied)}")
+
+
 def init_database() -> None:
     """
     Initialize the database by creating all tables.
@@ -54,6 +63,8 @@ def init_database() -> None:
             apply_migrations(db_path)
         else:
             logger.info("Skipping SQLite-specific migrations for non-SQLite backend.")
+
+        apply_attribution_migration()
 
         from sqlalchemy import inspect
 
